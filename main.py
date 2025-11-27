@@ -14,14 +14,14 @@ from opentelemetry.exporter.otlp.proto.http._log_exporter import OTLPLogExporter
 class SafeOTLPLogExporter:
     """
     Wraps OTLPLogExporter and implements exponential backoff on failures.
-    - initial backoff: 5s
+    - initial backoff: 1s
     - doubles on each failure up to max_backoff
     - exporter will attempt again after the backoff interval
     - avoids using the logging subsystem to prevent recursive exports
     """
 
     def __init__(
-        self, *args, initial_backoff: float = 5.0, max_backoff: float = 300.0, **kwargs
+        self, *args, initial_backoff: float = 1.0, max_backoff: float = 300.0, **kwargs
     ):
         self._inner = OTLPLogExporter(*args, **kwargs)
         self._lock = threading.Lock()
