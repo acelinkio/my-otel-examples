@@ -250,7 +250,7 @@ def configure_logging():
 
 def main():
     provider = configure_logging()
-    log = logging.getLogger("demo")
+    log = logging.getLogger(__name__)
 
     try:
         for i in range(300):
