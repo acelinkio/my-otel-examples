@@ -4,11 +4,18 @@ from opentelemetry.exporter.otlp.proto.http._log_exporter import (
     OTLPLogExporter as HttpLogExporter,
 )
 from opentelemetry.exporter.otlp.proto.http.metric_exporter import (
-	OTLPMetricExporter as HttpMetricExporter,
+    OTLPMetricExporter as HttpMetricExporter,
 )
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import (
-	OTLPSpanExporter as HttpSpanExporter,
+    OTLPSpanExporter as HttpSpanExporter,
 )
+
+import sys
+import time
+import threading
+import traceback
+from typing import Optional, Type, Any
+import socket
 
 proto_env = os.getenv("OTEL_EXPORTER_OTLP_PROTOCOL", "").lower().strip()
 endpoint_env = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT", "").strip()
@@ -45,7 +52,6 @@ else:
         MetricsExporterClass = GrpcMetricExporter
         TracesExporterClass = GrpcSpanExporter
     except Exception as exc:
-        import sys
         print(
             "gRPC OTLP exporter unavailable; falling back to HTTP exporter. "
             "Install system libstdc++ (e.g. apt install libstdc++6) to enable gRPC. "
@@ -56,18 +62,152 @@ else:
         MetricsExporterClass = HttpMetricExporter
         TracesExporterClass = HttpSpanExporter
 
+# --- Modular design: use module-level classes, remove resolver -----------------
+
+# compact mapping chosen at import time; tests can monkeypatch the three module vars.
+EXPORTER_CLASSES = {
+    "logs": LogExporterClass,
+    "traces": TracesExporterClass,
+    "metrics": MetricsExporterClass,
+}
+
+def make_safe_exporter(signal: str, *args, exporter_cls: Optional[Type[Any]] = None, **kwargs) -> "SafeOTLPExporter":
+    """Create a SafeOTLPExporter for the named signal using the module-level defaults."""
+    if exporter_cls is None:
+        try:
+            exporter_cls = EXPORTER_CLASSES[signal]
+        except KeyError:
+            raise ValueError(f"Unknown signal '{signal}' (expected one of {list(EXPORTER_CLASSES.keys())})")
+    return SafeOTLPExporter(*args, exporter_cls=exporter_cls, **kwargs)
+
+class SafeOTLPExporter:
+    """
+    Generic wrapper around an OTLP exporter instance that implements exponential
+    backoff on export failures and avoids using logging for internal messages.
+
+    NOTE: simplified: this wrapper no longer accepts a 'signal' string.  Pass an
+    exporter class explicitly, or use the convenience factory functions below
+    which use DEFAULT_EXPORTER_CLASS.
+    """
+
+    def __init__(
+        self,
+        *args,
+        exporter_cls: Optional[Type[Any]] = None,
+        endpoint: Optional[str] = None,
+        initial_backoff: float = 1.0,
+        max_backoff: float = 300.0,
+        **kwargs,
+    ):
+        # require an exporter class (keeps the wrapper signal-agnostic / simple)
+        if exporter_cls is None:
+            raise ValueError(
+                "exporter_cls is required. Use make_safe_log_exporter / "
+                "make_safe_trace_exporter / make_safe_metric_exporter or pass exporter_cls."
+            )
+
+        # instantiate the exporter (caller can pass endpoint/credentials via kwargs)
+        self._inner = exporter_cls(*args, **kwargs)
+        self._lock = threading.Lock()
+        self._reported = False
+        self._backoff_initial = float(initial_backoff)
+        self._backoff = float(initial_backoff)
+        self._max_backoff = float(max_backoff)
+        self._next_try = 0.0
+
+    def _report_once(self, message: str, exc: Optional[BaseException] = None):
+        if self._reported:
+            return
+        self._reported = True
+        print(message, file=sys.stderr)
+        if exc is not None:
+            traceback.print_exception(type(exc), exc, exc.__traceback__, file=sys.stderr)
+
+    def _report_retry(self, wait_seconds: float):
+        print(f"OTLP exporter will retry in {wait_seconds:.1f}s", file=sys.stderr)
+
+    def export(self, records) -> Optional[Any]:
+        now = time.time()
+        with self._lock:
+            if now < self._next_try:
+                # within backoff window, skip
+                return None
+        try:
+            return getattr(self._inner, "export")(records)
+        except Exception as exc:
+            with self._lock:
+                self._report_once("OTLP export failed; entering backoff. Disabling immediate exports.", exc)
+                self._report_retry(self._backoff)
+                self._next_try = time.time() + self._backoff
+                self._backoff = min(self._backoff * 2.0, self._max_backoff)
+            return None
+
+    def shutdown(self):
+        try:
+            return getattr(self._inner, "shutdown", lambda: None)()
+        except Exception as exc:
+            self._report_once("Exception while shutting down OTLP exporter", exc)
+
+    def force_flush(self, timeout_millis: int = 30000):
+        try:
+            return getattr(self._inner, "force_flush", lambda *a, **k: True)(timeout_millis)
+        except Exception as exc:
+            self._report_once("Exception during force_flush", exc)
+            return False
+
+# --- end SafeOTLPExporter -----------------------------------------------------
+
+def _is_endpoint_reachable(url: str, timeout: float = 0.5) -> bool:
+    p = urlparse(url)
+    host = p.hostname or "localhost"
+    # default ports: 4318 for http, 4317 for grpc if not provided
+    port = p.port or (4318 if p.scheme in ("http", "https") else 4317)
+    try:
+        with socket.create_connection((host, port), timeout):
+            return True
+    except Exception:
+        return False
 
 
 def main():
+    # quick reachability check before creating exporters
+    endpoint = endpoint_env or "grpc://localhost:4318/v1/logs"
+    reachable = _is_endpoint_reachable(endpoint, timeout=0.5)
+    print(f"Endpoint {endpoint} reachable: {reachable}", file=sys.stderr)
+
+    # Demonstrate resolving exporters for each signal using the module-level mapping.
     try:
-        for i in range(5):
+        signals = ["logs", "traces", "metrics"]
+        resolved = {}
+
+        for s in signals:
+            try:
+                wrapper = make_safe_exporter(s, endpoint=endpoint_env or None)
+            except Exception as e:
+                print(f"Could not create exporter for {s}: {e}", file=sys.stderr)
+                continue
+            cls = wrapper._inner.__class__
+            print(f"Resolved {s} exporter: {cls.__module__}.{cls.__name__}")
+            resolved[s] = wrapper
+
+        for i in range(50):
             print(f"--- Iteration {i} ---")
+            time.sleep(0.2)
+
     finally:
-        # Ensure processors call exporter.force_flush() and exporter.shutdown()
-        try:
-            print("test123")
-        except Exception:
-            pass
+        # tear down: call shutdown/force_flush on any wrappers we created
+        for w in resolved.values():
+            try:
+                w.force_flush()
+                w.shutdown()
+            except Exception:
+                pass
+
+
+# thin convenience aliases (optional)
+make_safe_log_exporter = lambda *a, exporter_cls=None, **kw: make_safe_exporter("logs", *a, exporter_cls=exporter_cls, **kw)
+make_safe_trace_exporter = lambda *a, exporter_cls=None, **kw: make_safe_exporter("traces", *a, exporter_cls=exporter_cls, **kw)
+make_safe_metric_exporter = lambda *a, exporter_cls=None, **kw: make_safe_exporter("metrics", *a, exporter_cls=exporter_cls, **kw)
 
 
 if __name__ == "__main__":
