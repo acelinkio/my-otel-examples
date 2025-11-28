@@ -16,6 +16,7 @@ import threading
 import traceback
 from typing import Optional, Type, Any
 import socket
+import logging
 
 proto_env = os.getenv("OTEL_EXPORTER_OTLP_PROTOCOL", "").lower().strip()
 endpoint_env = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT", "").strip()
@@ -94,20 +95,35 @@ class SafeOTLPExporter:
         self,
         *args,
         exporter_cls: Optional[Type[Any]] = None,
+        exporter_factory: Optional[callable] = None,
         endpoint: Optional[str] = None,
         initial_backoff: float = 1.0,
         max_backoff: float = 300.0,
         **kwargs,
     ):
-        # require an exporter class (keeps the wrapper signal-agnostic / simple)
-        if exporter_cls is None:
+        # require an exporter class or factory
+        if exporter_factory is None and exporter_cls is None:
             raise ValueError(
-                "exporter_cls is required. Use make_safe_log_exporter / "
-                "make_safe_trace_exporter / make_safe_metric_exporter or pass exporter_cls."
+                "exporter_cls or exporter_factory is required. Use make_safe_log_exporter / "
+                "make_safe_trace_exporter / make_safe_metric_exporter or pass one explicitly."
             )
 
-        # instantiate the exporter (caller can pass endpoint/credentials via kwargs)
-        self._inner = exporter_cls(*args, **kwargs)
+        # build a factory if only exporter_cls/args provided
+        if exporter_factory is None:
+            def _factory():
+                return exporter_cls(*args, **kwargs)
+            exporter_factory = _factory
+
+        self._factory = exporter_factory
+        # instantiate the exporter via factory
+        try:
+            self._inner = self._factory()
+        except Exception as exc:
+            # don't raise here; allow wrapper to exist and handle retries
+            self._inner = None
+            print("initial exporter instantiation failed; will retry on export()", file=sys.stderr)
+            traceback.print_exception(type(exc), exc, exc.__traceback__, file=sys.stderr)
+
         self._lock = threading.Lock()
         self._reported = False
         self._backoff_initial = float(initial_backoff)
@@ -132,6 +148,28 @@ class SafeOTLPExporter:
             if now < self._next_try:
                 # within backoff window, skip
                 return None
+
+        # If we previously failed and we have a factory, try to recreate the inner exporter now
+        if getattr(self, "_factory", None) is not None and self._inner is None:
+            try:
+                new_inner = self._factory()
+            except Exception as exc:
+                # failed to recreate; schedule next backoff and return
+                with self._lock:
+                    self._report_once("OTLP exporter recreation failed; staying in backoff.", exc)
+                    self._report_retry(self._backoff)
+                    self._next_try = time.time() + self._backoff
+                    self._backoff = min(self._backoff * 2.0, self._max_backoff)
+                return None
+            else:
+                # successfully recreated exporter; clear reported flag and reset backoff
+                with self._lock:
+                    self._inner = new_inner
+                    self._reported = False
+                    self._backoff = self._backoff_initial
+                    self._next_try = 0.0
+
+        # normal export attempt
         try:
             return getattr(self._inner, "export")(records)
         except Exception as exc:
@@ -157,34 +195,88 @@ class SafeOTLPExporter:
 
 # --- end SafeOTLPExporter -----------------------------------------------------
 
-def main():
-    # Demonstrate resolving exporters for each signal using the module-level mapping.
+# --- reachability probe + prober with exponential backoff --------------------
+ATTACHED_EXPORTERS: dict[str, "SafeOTLPExporter"] = {}
+
+def _is_endpoint_reachable(url: str, timeout: float = 0.5) -> bool:
+    p = urlparse(url)
+    host = p.hostname or "localhost"
+    # default ports: 4318 for HTTP, 4317 for gRPC if not provided
+    port = p.port or (4318 if p.scheme in ("http", "https") else 4317)
     try:
-        signals = ["logs", "traces", "metrics"]
-        resolved = {}
+        with socket.create_connection((host, port), timeout):
+            return True
+    except Exception:
+        return False
 
-        for s in signals:
+def start_otlp_prober_all(endpoint: str, signals: tuple[str, ...] = ("logs", "traces", "metrics"), initial_backoff: float = 1.0, max_backoff: float = 300.0):
+    """
+    Single background prober: check TCP reachability for `endpoint` and create
+    a SafeOTLPExporter for each signal in `signals` once reachable.
+    Exponential backoff on failures; logs attempts/retries.
+    """
+    logger = logging.getLogger("otlp.prober")
+
+    def _probe():
+        backoff = float(initial_backoff)
+        attempt = 0
+        logger.info("starting prober for %s -> signals=%s", endpoint, signals)
+        while True:
+            attempt += 1
             try:
-                wrapper = make_safe_exporter(s, endpoint=endpoint_env or None)
-            except Exception as e:
-                print(f"Could not create exporter for {s}: {e}", file=sys.stderr)
-                continue
-            cls = wrapper._inner.__class__
-            print(f"Resolved {s} exporter: {cls.__module__}.{cls.__name__}")
-            resolved[s] = wrapper
+                if _is_endpoint_reachable(endpoint, timeout=0.5):
+                    logger.info("endpoint reachable; creating exporters for %s", signals)
+                    for s in signals:
+                        try:
+                            wrapper = make_safe_exporter(s, endpoint=endpoint)
+                            ATTACHED_EXPORTERS[s] = wrapper
+                            logger.info("attached SafeOTLPExporter for %s", s)
+                        except Exception as exc:
+                            logger.exception("failed to create/attach exporter for %s: %s", s, exc)
+                    break
+                else:
+                    logger.warning("endpoint %s not reachable (attempt %d); retrying in %.1fs", endpoint, attempt, backoff)
+            except Exception as exc:
+                logger.exception("probe error on attempt %d: %s", attempt, exc)
 
-        for i in range(50):
-            print(f"--- Iteration {i} ---")
-            time.sleep(0.2)
+            time.sleep(backoff)
+            backoff = min(backoff * 2.0, max_backoff)
+
+    t = threading.Thread(target=_probe, daemon=True, name="otlp-prober-all")
+    t.start()
+    return t
+
+def main():
+    # configure structured logging for this test harness
+    logging.basicConfig(
+        level=logging.INFO,
+        format="[%(asctime)s] %(levelname)s %(name)s: %(message)s",
+        handlers=[logging.StreamHandler(sys.stderr)],
+    )
+    logger = logging.getLogger("test")
+
+    probers = []
+    try:
+        # Start one prober for the endpoint (creates exporters for all signals when reachable).
+        if endpoint_env:
+            probers.append(start_otlp_prober_all(endpoint_env, ("logs", "traces", "metrics"), initial_backoff=1.0, max_backoff=8.0))
+        else:
+            logger.info("OTEL_EXPORTER_OTLP_ENDPOINT is not set; not starting OTLP probers. Running main loop only.")
+
+        # run a short loop so you can observe prober output in the console (or just exercise app logic)
+        for i in range(30):
+            logger.info("main loop iteration %d", i)
+            time.sleep(0.5)
 
     finally:
-        # tear down: call shutdown/force_flush on any wrappers we created
-        for w in resolved.values():
+        # attempt clean shutdown of any attached exporters
+        for s, w in list(ATTACHED_EXPORTERS.items()):
             try:
+                logger.info("shutting down exporter for %s", s)
                 w.force_flush()
                 w.shutdown()
             except Exception:
-                pass
+                logger.exception("error shutting down exporter for %s", s)
 
 
 # thin convenience aliases (optional)
