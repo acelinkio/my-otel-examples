@@ -89,7 +89,7 @@ def setup_logging():
 
     # Add stdout handler
     stdout_handler = logging.StreamHandler(sys.stdout)
-    # set logging level via STDOUT_LOG_LEVEL env var or default to WARNING
+    # set logging level via STDOUT_LOG_LEVEL env var or default to INFO
     stdout_handler.setLevel(getattr(logging, os.getenv("STDOUT_LOG_LEVEL", "INFO").upper()))
     stdout_handler.setFormatter(
         logging.Formatter(
