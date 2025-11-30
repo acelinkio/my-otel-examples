@@ -55,4 +55,4 @@ dev:
         echo "Starting..."
         ./.venv/bin/fastapi run .
     ports:
-      - port: "4389"
+      - port: "8000"
