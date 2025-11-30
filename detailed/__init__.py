@@ -1,6 +1,20 @@
 from fastapi import FastAPI
+# configure logging first so any later imports/logs use your formatter
+from detailed.log import configure_logging
+configure_logging()
 
-app = FastAPI()
+# install OTEL as early as possible (will allow subsequent logs to be forwarded)
+from detailed.otel import setup_otelproviders
+setup_otelproviders()
+
+import logging
+logger = logging.getLogger(__name__)
+
+app = FastAPI(
+    title="detailed",
+    description="quick example application",
+    root_path="/detailed",
+)
 
 
 @app.get("/")
