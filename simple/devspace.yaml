@@ -1,5 +1,5 @@
 version: v2beta1
-name: python-otel
+name: simple
 deployments:
   backend:
     kubectl:
@@ -35,7 +35,7 @@ dev:
     devImage: docker.io/astral/uv:python3.13-trixie
     workingDir: /app
     sync:
-      - path: ./simple:/app
+      - path: .:/app
         excludePaths:
           - __pycache__
           - .venv
