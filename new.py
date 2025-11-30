@@ -1,9 +1,8 @@
-def setup_opentelemetry() -> tuple[bool, object, object, object]:
+def setup_otelexporters() -> tuple[object, object, object]:
     import os
-    enabled = True
     if not (os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT", "").strip()):
-        print("OTEL_EXPORTER_OTLP_ENDPOINT not specified, skipping otel setup.")
-        return False, None, None, None
+        print("OTEL_EXPORTER_OTLP_ENDPOINT not specified, skipping otel exporter setup.")
+        return None, None, None
     elif os.getenv("OTEL_EXPORTER_OTLP_PROTOCOL", "").lower().strip() == "grpc":
         # lazy-import gRPC exporter; if that fails, fail hard
         try:
@@ -72,18 +71,17 @@ def setup_opentelemetry() -> tuple[bool, object, object, object]:
     logger_provider.add_log_record_processor(BatchLogRecordProcessor(OTLPLogExporter()))
     _logs.set_logger_provider(logger_provider)
 
-    return enabled, tracer_provider, meter_provider, logger_provider
+    return tracer_provider, meter_provider, logger_provider
 
-def setup_logging(otel_enabled: bool):
+def setup_logging():
     import sys
     import logging
+    from opentelemetry.sdk._logs import LoggingHandler
+    
     root_logger = logging.getLogger()
-    root_logger.setLevel(logging.INFO)
-    if otel_enabled:
-        from opentelemetry.sdk._logs import LoggingHandler
-        py_handler = LoggingHandler(level=logging.INFO)
-        root_logger.addHandler(py_handler)
-        print("otelling you")
+    root_logger.setLevel(logging.DEBUG)
+    root_logger.addHandler(LoggingHandler())
+
     stdout_handler = logging.StreamHandler(sys.stdout)
     stdout_handler.setLevel(logging.WARNING)
     stdout_handler.setFormatter(
@@ -96,14 +94,16 @@ def setup_logging(otel_enabled: bool):
 
 def main():
     try:
-        otel_enabled, tracer_provider, meter_provider, logger_provider = setup_opentelemetry()
-        setup_logging(otel_enabled)
         import logging
         from opentelemetry import trace, metrics
+
+        tracer_provider, meter_provider, logger_provider = setup_otelexporters()
+        setup_logging()
 
         log = logging.getLogger(__name__)
         tracer = trace.get_tracer(__name__)
         meter = metrics.get_meter(__name__)
+        
         counter = meter.create_counter("example.counter", description="Example counter")
 
         import time
