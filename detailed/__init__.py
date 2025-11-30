@@ -8,7 +8,7 @@ from .otel import setup_otelproviders
 setup_otelproviders()
 
 import logging
-logger = logging.getLogger(__name__)
+log = logging.getLogger(__name__)
 
 app = FastAPI(
     title="detailed",
@@ -16,7 +16,11 @@ app = FastAPI(
     root_path="/detailed",
 )
 
-
 @app.get("/")
 async def root():
     return {"message": "Hello World"}
+
+log.info("info: YOU ROCK")
+log.warn("warn: I rock")
+log.exception("exception: dogs are amazing")
+log.exception("exception: cats are fluffy")

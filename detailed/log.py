@@ -1,36 +1,24 @@
 import logging
-import logging.config
 import os
+import sys
+
+from opentelemetry.sdk._logs import LoggingHandler
 
 def configure_logging():
-    level = os.getenv("LOG_LEVEL", "INFO").upper()
+    root_logger = logging.getLogger()
+    # Add stdout handler
+    stdout_handler = logging.StreamHandler(sys.stdout)
+    # set logging level via STDOUT_LOG_LEVEL env var or default to INFO
+    stdout_handler.setLevel(getattr(logging, os.getenv("STDOUT_LOG_LEVEL", "INFO").upper()))
+    stdout_handler.setFormatter(
+        logging.Formatter(
+            fmt="[STDOUT][{levelname}][{name}] {message}",
+            style="{",
+        )
+    )
+    root_logger.addHandler(stdout_handler)
 
-    LOGGING = {
-        "version": 1,
-        "disable_existing_loggers": False,
-        "formatters": {
-            "standard": {
-                "format": "%(asctime)s %(levelname)s %(name)s %(message)s"
-            }
-        },
-        "handlers": {
-            "console": {
-                "class": "logging.StreamHandler",
-                "formatter": "standard",
-                "stream": "ext://sys.stdout"
-            }
-        },
-        "root": {
-            "handlers": ["console"],
-            "level": level
-        },
-        "loggers": {
-            # let uvicorn loggers propagate to root so LoggingInstrumentor (attached to root)
-            # can see and forward their records to OpenTelemetry
-            "uvicorn": {"level": level, "propagate": True},
-            "uvicorn.error": {"level": level, "propagate": True},
-            "uvicorn.access": {"level": level, "propagate": True},
-        },
-    }
-
-    logging.config.dictConfig(LOGGING)
+    # Add OpenTelemetry handler
+    # set logging level via OTEL_LOG_LEVEL env var
+    # https://opentelemetry.io/docs/specs/otel/configuration/sdk-environment-variables/#general-sdk-configuration
+    root_logger.addHandler(LoggingHandler())
