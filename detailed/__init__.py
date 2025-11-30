@@ -22,5 +22,5 @@ async def root():
 
 log.info("info: YOU ROCK")
 log.warn("warn: I rock")
-log.exception("exception: dogs are amazing")
-log.exception("exception: cats are fluffy")
+log.error("exception: dogs are amazing")
+log.error("exception: cats are fluffy")
