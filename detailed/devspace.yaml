@@ -1,5 +1,5 @@
 version: v2beta1
-name: simple
+name: detailed
 deployments:
   backend:
     kubectl:
@@ -7,7 +7,7 @@ deployments:
         apiVersion: apps/v1
         kind: Deployment
         metadata:
-          name: simple
+          name: detailed
         spec:
           selector:
             matchLabels:
@@ -29,6 +29,10 @@ deployments:
                 args:
                 - sleep
                 - "1000000"
+                ports:
+                  - name: main
+                    containerPort: 8000
+                    protocol: TCP
 dev:
   backend:
     imageSelector: docker.io/busybox:1.28
@@ -49,6 +53,6 @@ dev:
         echo "Running uv sync..."
         uv sync --locked || (echo 'uv sync failed' && exit 1)
         echo "Starting..."
-        uv run main.py
+        ./.venv/bin/fastapi run .
     ports:
       - port: "4389"
