@@ -1,11 +1,16 @@
-import os
 import logging
+from fastapi import FastAPI
 
 logger = logging.getLogger(__name__)
 
+
 def setup_otelproviders() -> tuple[object, object, object]:
+    import os
+
     if not (os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT", "").strip()):
-        logger.info("OTEL_EXPORTER_OTLP_ENDPOINT not specified, skipping otel provider setup.")
+        logger.info(
+            "OTEL_EXPORTER_OTLP_ENDPOINT not specified, skipping otel provider setup."
+        )
         return None, None, None
 
     # choose exporters (grpc vs http) ...
@@ -75,3 +80,18 @@ def setup_otelproviders() -> tuple[object, object, object]:
     _logs.set_logger_provider(logger_provider)
 
     return tracer_provider, meter_provider, logger_provider
+
+
+def instrument(app: FastAPI):
+    from opentelemetry.instrumentation.aiohttp_client import AioHttpClientInstrumentor
+    from opentelemetry.instrumentation.asyncpg import AsyncPGInstrumentor
+    from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+
+    FastAPIInstrumentor.instrument_app(
+        app,
+        http_capture_headers_server_request=[".*"],
+        http_capture_headers_server_response=[".*"],
+        excluded_urls="/health$,/ready$",
+    )
+    AioHttpClientInstrumentor().instrument()
+    AsyncPGInstrumentor().instrument()
