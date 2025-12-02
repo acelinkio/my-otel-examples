@@ -1,5 +1,5 @@
 version: v2beta1
-name: detailed
+name: python-fastapi
 deployments:
   backend:
     kubectl:
@@ -7,7 +7,7 @@ deployments:
         apiVersion: apps/v1
         kind: Deployment
         metadata:
-          name: detailed
+          name: python-fastapi
         spec:
           selector:
             matchLabels:
