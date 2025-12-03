@@ -4,26 +4,16 @@ import (
     "context"
     "os"
 
-    "go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc"
-    sdklog "go.opentelemetry.io/otel/sdk/log"
     "go.uber.org/zap"
     "go.uber.org/zap/zapcore"
 
     "go.opentelemetry.io/contrib/bridges/otelzap"
+    otellog "go.opentelemetry.io/otel/log"
 )
 
-// InitLogger sets up the OTLP exporter + zap logger. It returns the logger,
-// a shutdown function that must be called before exit, and an error.
-func InitLogger(ctx context.Context) (*zap.Logger, func(context.Context) error, error) {
-    exp, err := otlploggrpc.New(ctx)
-    if err != nil {
-        return nil, nil, err
-    }
-
-    provider := sdklog.NewLoggerProvider(
-        sdklog.WithProcessor(sdklog.NewBatchProcessor(exp)),
-    )
-
+// InitLogger sets up the zap logger wired to OpenTelemetry. It accepts a
+// otel API LoggerProvider produced elsewhere (e.g. InitOtelLogging).
+func InitLogger(ctx context.Context, provider otellog.LoggerProvider) (*zap.Logger, func(context.Context) error, error) {
     core := zapcore.NewTee(
         zapcore.NewCore(zapcore.NewJSONEncoder(zap.NewProductionEncoderConfig()), zapcore.AddSync(os.Stdout), zapcore.InfoLevel),
         otelzap.NewCore("my/pkg/name", otelzap.WithLoggerProvider(provider)),
@@ -32,7 +22,8 @@ func InitLogger(ctx context.Context) (*zap.Logger, func(context.Context) error, 
     logger := zap.New(core)
 
     shutdown := func(ctx context.Context) error {
-        return provider.Shutdown(ctx)
+        // provider shutdown is handled by InitOtelLogging's returned shutdown.
+        return nil
     }
 
     return logger, shutdown, nil
