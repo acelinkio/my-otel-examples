@@ -63,7 +63,15 @@ func (t *tee) WithGroup(name string) slog.Handler {
 }
 
 func InitLogger(ctx context.Context) (*SlogAdapter, func(context.Context) error, error) {
-	stdout := slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{})
+	stdout := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
+		ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
+			// drop the default time attribute so text output has no timestamp
+			if a.Key == "time" {
+				return slog.Attr{}
+			}
+			return a
+		},
+	})
 	otelHandler := otelslog.NewHandler("mylog", otelslog.WithLoggerProvider(global.GetLoggerProvider()))
 
 	minStdout := parseLogLevel(os.Getenv("STDOUT_LOG_LEVEL"))
