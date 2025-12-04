@@ -8,19 +8,19 @@ import (
 func main() {
 	ctx := context.Background()
 
-	provider, shutdownOtel, err := InitOtelLogging(ctx)
+	shutdownOtel, err := InitOtelLogging(ctx)
 	if err != nil {
 		log.Fatalf("otel init: %v", err)
 	}
 	defer shutdownOtel(ctx)
 
-	logger, _, err := InitLogger(ctx, provider)
+	logger, _, err := InitLogger(ctx)
 	if err != nil {
 		log.Fatalf("logger init: %v", err)
 	}
 	defer logger.Sync()
 
-	logger.Info("5hey info")
-	logger.Warn("5be careful!")
-	logger.Error("5stOPPP right now!!!")
+	logger.Info("dog")
+	logger.Warn("heyuo")
+	logger.Error("123")
 }

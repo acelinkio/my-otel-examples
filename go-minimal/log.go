@@ -6,7 +6,6 @@ import (
     "os"
     "strings"
 
-    otellog "go.opentelemetry.io/otel/log"
     otelslog "go.opentelemetry.io/contrib/bridges/otelslog"
 )
 
@@ -62,9 +61,9 @@ func (t *tee) WithGroup(name string) slog.Handler {
     return NewTee(t.a.WithGroup(name), t.b.WithGroup(name), t.minA, t.minB)
 }
 
-func InitLogger(ctx context.Context, provider otellog.LoggerProvider) (*SlogAdapter, func(context.Context) error, error) {
+func InitLogger(ctx context.Context) (*SlogAdapter, func(context.Context) error, error) {
     stdout := slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{})
-    otelHandler := otelslog.NewHandler("test123", otelslog.WithLoggerProvider(provider))
+    otelHandler := otelslog.NewHandler("mylog", otelslog.WithLoggerProvider(defaultOtelProvider))
 
     minStdout := parseLogLevel(os.Getenv("STDOUT_LOG_LEVEL"))
     minOtel := parseLogLevel(os.Getenv("OTEL_LOG_LEVEL"))
