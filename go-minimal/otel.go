@@ -1,11 +1,11 @@
 package main
 
 import (
-    "context"
+	"context"
 
-    "go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc"
-    otellog "go.opentelemetry.io/otel/log"
-    sdklog "go.opentelemetry.io/otel/sdk/log"
+	"go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc"
+	otellog "go.opentelemetry.io/otel/log"
+	sdklog "go.opentelemetry.io/otel/sdk/log"
 )
 
 var defaultOtelProvider otellog.LoggerProvider
@@ -13,21 +13,21 @@ var defaultOtelProvider otellog.LoggerProvider
 // InitOtelLogging creates the OTLP log exporter and returns a shutdown function.
 // It stores the provider in a package-level variable so InitLogger doesn't need it.
 func InitOtelLogging(ctx context.Context) (func(context.Context) error, error) {
-    exp, err := otlploggrpc.New(ctx)
-    if err != nil {
-        return nil, err
-    }
+	exp, err := otlploggrpc.New(ctx)
+	if err != nil {
+		return nil, err
+	}
 
-    provider := sdklog.NewLoggerProvider(
-        sdklog.WithProcessor(sdklog.NewBatchProcessor(exp)),
-    )
+	provider := sdklog.NewLoggerProvider(
+		sdklog.WithProcessor(sdklog.NewBatchProcessor(exp)),
+	)
 
-    // store for InitLogger
-    defaultOtelProvider = provider
+	// store for InitLogger
+	defaultOtelProvider = provider
 
-    shutdown := func(ctx context.Context) error {
-        return provider.Shutdown(ctx)
-    }
+	shutdown := func(ctx context.Context) error {
+		return provider.Shutdown(ctx)
+	}
 
-    return shutdown, nil
+	return shutdown, nil
 }
