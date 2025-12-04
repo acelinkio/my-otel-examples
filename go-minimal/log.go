@@ -63,7 +63,7 @@ func (t *tee) WithGroup(name string) slog.Handler {
 
 func InitLogger(ctx context.Context) (*SlogAdapter, func(context.Context) error, error) {
 	stdout := slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{})
-	otelHandler := otelslog.NewHandler("mylog", otelslog.WithLoggerProvider(defaultOtelProvider))
+	otelHandler := otelslog.NewHandler("mylog", otelslog.WithLoggerProvider(otelprovider))
 
 	minStdout := parseLogLevel(os.Getenv("STDOUT_LOG_LEVEL"))
 	minOtel := parseLogLevel(os.Getenv("OTEL_LOG_LEVEL"))

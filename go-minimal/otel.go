@@ -8,7 +8,7 @@ import (
 	sdklog "go.opentelemetry.io/otel/sdk/log"
 )
 
-var defaultOtelProvider otellog.LoggerProvider
+var otelprovider otellog.LoggerProvider
 
 // InitOtelLogging creates the OTLP log exporter and returns a shutdown function.
 // It stores the provider in a package-level variable so InitLogger doesn't need it.
@@ -18,15 +18,12 @@ func InitOtelLogging(ctx context.Context) (func(context.Context) error, error) {
 		return nil, err
 	}
 
-	provider := sdklog.NewLoggerProvider(
+	otelprovider := sdklog.NewLoggerProvider(
 		sdklog.WithProcessor(sdklog.NewBatchProcessor(exp)),
 	)
 
-	// store for InitLogger
-	defaultOtelProvider = provider
-
 	shutdown := func(ctx context.Context) error {
-		return provider.Shutdown(ctx)
+		return otelprovider.Shutdown(ctx)
 	}
 
 	return shutdown, nil
