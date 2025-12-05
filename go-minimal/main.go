@@ -14,11 +14,11 @@ func main() {
 	}
 	defer logger.Sync()
 
-	shutdownOtel, err := InitOtelLogging(ctx)
+	cleanup, err := InitOtelLogging(ctx)
 	if err != nil {
 		slog.Error("otel init", "err", err)
 	}
-	defer func() { _ = shutdownOtel(ctx) }()
+	defer cleanup(ctx)
 
 	slog.Info("info: dog barks")
 	slog.Warn("warning: don't 123")

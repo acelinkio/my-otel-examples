@@ -6,12 +6,22 @@ import (
 	"os"
 	"strings"
 
+	"go.opentelemetry.io/otel/sdk/resource"
+	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
+	otel "go.opentelemetry.io/otel"
+
 	"go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc"
 	"go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploghttp"
 	logotel "go.opentelemetry.io/otel/log"
-	logotelglobal"go.opentelemetry.io/otel/log/global"
+	logotelnoop "go.opentelemetry.io/otel/log/noop"
+	logotelglobal "go.opentelemetry.io/otel/log/global"
 	logsdk "go.opentelemetry.io/otel/sdk/log"
-	logsdknoop "go.opentelemetry.io/otel/log/noop"
+
+	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc"
+	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp"
+	metricotel "go.opentelemetry.io/otel/metric"
+	metricotelnoop "go.opentelemetry.io/otel/metric/noop"
+	metricsdk "go.opentelemetry.io/otel/sdk/metric"
 )
 
 // InitOtelLogging creates the OTLP log exporter and returns a shutdown function.
@@ -19,7 +29,22 @@ import (
 // setup if OTEL_EXPORTER_OTLP_ENDPOINT is not set.
 func InitOtelLogging(ctx context.Context) (func(context.Context) error, error) {
 	var le logsdk.Exporter
+	var me metricsdk.Exporter
 	var err error
+
+	res, err := resource.New(
+		ctx,
+		resource.WithAttributes(semconv.ServiceNameKey.String("example")),
+		resource.WithFromEnv(),
+		resource.WithTelemetrySDK(),
+		resource.WithProcess(),
+		resource.WithOS(),
+		resource.WithContainer(),
+		resource.WithHost(),
+	)
+	if err != nil {
+		return nil, err
+	}
 
 	endpoint := strings.TrimSpace(os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT"))
 	slog.Info("Configuring OTEL")
@@ -28,35 +53,64 @@ func InitOtelLogging(ctx context.Context) (func(context.Context) error, error) {
 		slog.Info("OTEL_EXPORTER_OTLP_ENDPOINT not set")
 		slog.Info("Using NoOp exporters")
 		le = nil
+		me = nil
 	case strings.ToLower(strings.TrimSpace(os.Getenv("OTEL_EXPORTER_OTLP_PROTOCOL"))) == "grpc":
 		slog.Info("Using OTLP gRPC exporters")
 		le, err = otlploggrpc.New(ctx)
+		me, err = otlpmetricgrpc.New(ctx)
 	default:
 		slog.Info("Using OTLP HTTP exporters")
 		le, err = otlploghttp.New(ctx)
+		me, err = otlpmetrichttp.New(ctx)
 	}
 	if err != nil {
 		return nil, err
 	}
 
 	// default to noop providers
-	var lp logotel.LoggerProvider = logsdknoop.NewLoggerProvider()
+	var lp logotel.LoggerProvider = logotelnoop.NewLoggerProvider()
+	var mp metricotel.MeterProvider = metricotelnoop.NewMeterProvider()
 
-	// use provider with configured exporter
+	// use exporter if configured
 	if le != nil {
 		lp = logsdk.NewLoggerProvider(
 			logsdk.WithProcessor(logsdk.NewBatchProcessor(le)),
 		)
 	}
+	
+	if me != nil {
+		mp = metricsdk.NewMeterProvider(
+			metricsdk.WithReader(
+				metricsdk.NewPeriodicReader(me),
+			),
+			metricsdk.WithResource(res),
+		)
+	}
+	
+	// set providers
 	logotelglobal.SetLoggerProvider(lp)
+	otel.SetMeterProvider(mp)
 
+	// configure shutting down
 	log_shutdown := func(ctx context.Context) error {
-		slog.Info("Shutting down OTEL")
-		if logsdkProvider, ok := lp.(*logsdk.LoggerProvider); ok && logsdkProvider != nil {
-			return logsdkProvider.Shutdown(ctx)
+		slog.Info("Shutting down OTEL logs")
+		if otelprovider, ok := lp.(*logsdk.LoggerProvider); ok && otelprovider != nil {
+			return otelprovider.Shutdown(ctx)
 		}
 		return nil
 	}
 
-	return log_shutdown, nil
+	metric_shutdown := func(ctx context.Context) error {
+		slog.Info("Shutting down OTEL metric")
+		if otelprovider, ok := mp.(*metricsdk.MeterProvider); ok && otelprovider != nil {
+			return otelprovider.Shutdown(ctx)
+		}
+		return nil
+	}
+
+	return func(ctx context.Context) error {
+		metric_shutdown(ctx)
+		log_shutdown(ctx)
+		return nil
+	}, nil
 }
