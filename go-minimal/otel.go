@@ -2,19 +2,20 @@ package main
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"os"
 	"strings"
 
+	otel "go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/sdk/resource"
 	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
-	otel "go.opentelemetry.io/otel"
 
 	"go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc"
 	"go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploghttp"
 	logotel "go.opentelemetry.io/otel/log"
-	logotelnoop "go.opentelemetry.io/otel/log/noop"
 	logotelglobal "go.opentelemetry.io/otel/log/global"
+	logotelnoop "go.opentelemetry.io/otel/log/noop"
 	logsdk "go.opentelemetry.io/otel/sdk/log"
 
 	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc"
@@ -25,9 +26,9 @@ import (
 
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
+	tracesdk "go.opentelemetry.io/otel/sdk/trace"
 	traceotel "go.opentelemetry.io/otel/trace"
 	traceotelnoop "go.opentelemetry.io/otel/trace/noop"
-	tracesdk "go.opentelemetry.io/otel/sdk/trace"
 )
 
 // InitOtelLogging creates the OTLP log exporter and returns a shutdown function.
@@ -86,6 +87,7 @@ func SetupOtel(ctx context.Context) (func(context.Context) error, error) {
 	if le != nil {
 		lp = logsdk.NewLoggerProvider(
 			logsdk.WithProcessor(logsdk.NewBatchProcessor(le)),
+			logsdk.WithResource(res),
 		)
 	}
 
@@ -134,9 +136,22 @@ func SetupOtel(ctx context.Context) (func(context.Context) error, error) {
 
 	return func(ctx context.Context) error {
 		slog.Info("Shutting down OTEL")
-		metric_shutdown(ctx)
-		trace_shutdown(ctx)
-		log_shutdown(ctx)
-		return nil
+
+		// run shutdowns and collect errors
+		var errs []error
+		if err := trace_shutdown(ctx); err != nil {
+			errs = append(errs, err)
+		}
+		if err := metric_shutdown(ctx); err != nil {
+			errs = append(errs, err)
+		}
+		if err := log_shutdown(ctx); err != nil {
+			errs = append(errs, err)
+		}
+
+		if len(errs) == 0 {
+			return nil
+		}
+		return errors.Join(errs...)
 	}, nil
 }
