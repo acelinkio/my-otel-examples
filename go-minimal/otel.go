@@ -22,6 +22,12 @@ import (
 	metricotel "go.opentelemetry.io/otel/metric"
 	metricotelnoop "go.opentelemetry.io/otel/metric/noop"
 	metricsdk "go.opentelemetry.io/otel/sdk/metric"
+
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
+	traceotel "go.opentelemetry.io/otel/trace"
+	traceotelnoop "go.opentelemetry.io/otel/trace/noop"
+	tracesdk "go.opentelemetry.io/otel/sdk/trace"
 )
 
 // InitOtelLogging creates the OTLP log exporter and returns a shutdown function.
@@ -30,6 +36,7 @@ import (
 func InitOtelLogging(ctx context.Context) (func(context.Context) error, error) {
 	var le logsdk.Exporter
 	var me metricsdk.Exporter
+	var te tracesdk.SpanExporter
 	var err error
 
 	res, err := resource.New(
@@ -54,14 +61,17 @@ func InitOtelLogging(ctx context.Context) (func(context.Context) error, error) {
 		slog.Info("Using NoOp exporters")
 		le = nil
 		me = nil
+		te = nil
 	case strings.ToLower(strings.TrimSpace(os.Getenv("OTEL_EXPORTER_OTLP_PROTOCOL"))) == "grpc":
 		slog.Info("Using OTLP gRPC exporters")
 		le, err = otlploggrpc.New(ctx)
 		me, err = otlpmetricgrpc.New(ctx)
+		te, err = otlptracegrpc.New(ctx)
 	default:
 		slog.Info("Using OTLP HTTP exporters")
 		le, err = otlploghttp.New(ctx)
 		me, err = otlpmetrichttp.New(ctx)
+		te, err = otlptracehttp.New(ctx)
 	}
 	if err != nil {
 		return nil, err
@@ -70,6 +80,7 @@ func InitOtelLogging(ctx context.Context) (func(context.Context) error, error) {
 	// default to noop providers
 	var lp logotel.LoggerProvider = logotelnoop.NewLoggerProvider()
 	var mp metricotel.MeterProvider = metricotelnoop.NewMeterProvider()
+	var tp traceotel.TracerProvider = traceotelnoop.NewTracerProvider()
 
 	// use exporter if configured
 	if le != nil {
@@ -77,7 +88,7 @@ func InitOtelLogging(ctx context.Context) (func(context.Context) error, error) {
 			logsdk.WithProcessor(logsdk.NewBatchProcessor(le)),
 		)
 	}
-	
+
 	if me != nil {
 		mp = metricsdk.NewMeterProvider(
 			metricsdk.WithReader(
@@ -86,14 +97,21 @@ func InitOtelLogging(ctx context.Context) (func(context.Context) error, error) {
 			metricsdk.WithResource(res),
 		)
 	}
-	
+
+	if te != nil {
+		tp = tracesdk.NewTracerProvider(
+			tracesdk.WithBatcher(te),
+			tracesdk.WithResource(res),
+		)
+	}
+
 	// set providers
 	logotelglobal.SetLoggerProvider(lp)
 	otel.SetMeterProvider(mp)
+	otel.SetTracerProvider(tp)
 
 	// configure shutting down
 	log_shutdown := func(ctx context.Context) error {
-		slog.Info("Shutting down OTEL logs")
 		if otelprovider, ok := lp.(*logsdk.LoggerProvider); ok && otelprovider != nil {
 			return otelprovider.Shutdown(ctx)
 		}
@@ -101,15 +119,23 @@ func InitOtelLogging(ctx context.Context) (func(context.Context) error, error) {
 	}
 
 	metric_shutdown := func(ctx context.Context) error {
-		slog.Info("Shutting down OTEL metric")
 		if otelprovider, ok := mp.(*metricsdk.MeterProvider); ok && otelprovider != nil {
 			return otelprovider.Shutdown(ctx)
 		}
 		return nil
 	}
 
+	trace_shutdown := func(ctx context.Context) error {
+		if otelprovider, ok := tp.(*tracesdk.TracerProvider); ok && otelprovider != nil {
+			return otelprovider.Shutdown(ctx)
+		}
+		return nil
+	}
+
 	return func(ctx context.Context) error {
+		slog.Info("Shutting down OTEL")
 		metric_shutdown(ctx)
+		trace_shutdown(ctx)
 		log_shutdown(ctx)
 		return nil
 	}, nil
