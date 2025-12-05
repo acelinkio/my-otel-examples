@@ -34,48 +34,48 @@ func main() {
 	e := echo.New()
 	e.Logger.SetOutput(logger)
 
-	// build ignore set from env or fall back to defaults
-	var ignore map[string]struct{}
+	// build ignore list from env or fall back to defaults
+	var ignore []string
 	if val, ok := os.LookupEnv("LOG_IGNORE_WEBPATHS"); !ok {
 		// env not provided -> use defaults
-		ignore = map[string]struct{}{
-			"/health":      {},
-			"/favicon.ico": {},
-			"/ready":       {},
+		slog.Info("LOG_IGNORE_WEBPATHS not set, using defaults")
+		ignore = []string{
+			"/health",
+			"/favicon.ico",
+			"/ready",
 		}
 	} else {
-
-		ignore = make(map[string]struct{})
 		val = strings.TrimSpace(val)
 		if val != "" {
 			for _, p := range strings.Split(val, ",") {
-				p = strings.TrimSpace(p)
-				if p == "" {
-					continue
+				if p = strings.TrimSpace(p); p != "" {
+					ignore = append(ignore, p)
 				}
-				ignore[p] = struct{}{}
 			}
 		}
 	}
-	paths := make([]string, 0, len(ignore))
-	for p := range ignore {
-		paths = append(paths, p)
-	}
-	sort.Strings(paths)
-	if len(paths) == 0 {
+	sort.Strings(ignore)
+	if len(ignore) == 0 {
 		slog.Info("web_request.ignore_paths", "paths", "none")
 	} else {
-		slog.Info("web_request.ignore_paths", "paths", strings.Join(paths, ","))
+		slog.Info("web_request.ignore_paths", "paths", strings.Join(ignore, ","))
 	}
 
+	contains := func(list []string, s string) bool {
+		for _, v := range list {
+			if v == s {
+				return true
+			}
+		}
+		return false
+	}
 	// using example from https://echo.labstack.com/docs/middleware/logger#examples
 	// full configs https://github.com/labstack/echo/blob/master/middleware/request_logger.go
 	e.Use(middleware.RequestLoggerWithConfig(middleware.RequestLoggerConfig{
 		// declare a small set of paths to ignore
 		Skipper: func(c echo.Context) bool {
 			p := c.Request().URL.Path
-			_, skip := ignore[p]
-			return skip
+			return contains(ignore, p)
 		},
 		LogStatus:    true,
 		LogURI:       true,
