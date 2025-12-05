@@ -56,10 +56,9 @@ func SetupOtel(ctx context.Context) (func(context.Context) error, error) {
 		return nil, err
 	}
 
-	endpoint := strings.TrimSpace(os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT"))
 	slog.Info("Configuring OTEL")
 	switch {
-	case endpoint == "":
+	case strings.TrimSpace(os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT")) == "":
 		slog.Info("Using OLTP exporter type", "type", "noop")
 		le = nil
 		me = nil
