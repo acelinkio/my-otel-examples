@@ -1,5 +1,5 @@
 version: v2beta1
-name: go-simple
+name: go-minimal
 deployments:
   backend:
     kubectl:
@@ -7,7 +7,7 @@ deployments:
         apiVersion: apps/v1
         kind: Deployment
         metadata:
-          name: go-simple
+          name: go-minimal
         spec:
           selector:
             matchLabels:
@@ -31,7 +31,7 @@ deployments:
                 - "1000000"
                 ports:
                   - name: main
-                    containerPort: 8021
+                    containerPort: 8025
                     protocol: TCP
 dev:
   backend:
@@ -47,7 +47,6 @@ dev:
       - bash
       - -c
       - |
-        go mod download
-        go run .
+        sleep 100000
     ports:
-      - port: "8021"
+      - port: "8025"
