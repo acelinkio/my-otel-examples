@@ -35,20 +35,27 @@ func main() {
 	//e.Use(middleware.Logger())
 
 	// using example from https://echo.labstack.com/docs/middleware/logger#examples
+	// full configs https://github.com/labstack/echo/blob/master/middleware/request_logger.go
 	e.Use(middleware.RequestLoggerWithConfig(middleware.RequestLoggerConfig{
     LogStatus:   true,
     LogURI:      true,
     LogError:    true,
+		LogHost:		 true,
+		LogMethod:	 true,
     HandleError: true, // forwards error to the global error handler, so it can decide appropriate status code
     LogValuesFunc: func(c echo.Context, v middleware.RequestLoggerValues) error {
         if v.Error == nil {
             logger.LogAttrs(context.Background(), slog.LevelInfo, "REQUEST",
-                slog.String("uri", v.URI),
+								slog.String("host", v.Host),
+								slog.String("method", v.Method),
+								slog.String("uri", v.URI),
                 slog.Int("status", v.Status),
             )
         } else {
             logger.LogAttrs(context.Background(), slog.LevelError, "REQUEST_ERROR",
-                slog.String("uri", v.URI),
+								slog.String("host", v.Host),
+								slog.String("method", v.Method),
+								slog.String("uri", v.URI),
                 slog.Int("status", v.Status),
                 slog.String("err", v.Error.Error()),
             )
