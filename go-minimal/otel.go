@@ -22,7 +22,7 @@ func InitOtelLogging(ctx context.Context) (func(context.Context) error, error) {
 	var err error
 
 	endpoint := strings.TrimSpace(os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT"))
-
+	slog.Info("Configuring OTEL")
 	switch {
     case endpoint == "":
         slog.Info("OTEL_EXPORTER_OTLP_ENDPOINT not set")
@@ -53,12 +53,13 @@ func InitOtelLogging(ctx context.Context) (func(context.Context) error, error) {
 	}
 	global.SetLoggerProvider(provider)
 
-	shutdown := func(ctx context.Context) error {
-			if sdkProvider == nil {
-					return nil
-			}
+	log_shutdown := func(ctx context.Context) error {
+		slog.Info("Shutting down OTEL")
+		if sdkProvider == nil {
+			return nil
+		}
 			return sdkProvider.Shutdown(ctx)
     }
 
-	return shutdown, nil
+	return log_shutdown, nil
 }

@@ -16,7 +16,9 @@ type SlogAdapter struct {
 	*slog.Logger
 }
 
-func (a *SlogAdapter) Sync() error { return nil }
+func (a *SlogAdapter) Sync() error { 
+	return nil 
+}
 
 type tee struct {
 	a, b slog.Handler
