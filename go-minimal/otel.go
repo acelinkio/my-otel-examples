@@ -8,17 +8,17 @@ import (
 
 	"go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc"
 	"go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploghttp"
-	otellog "go.opentelemetry.io/otel/log"
-	"go.opentelemetry.io/otel/log/global"
-	noopsdklog "go.opentelemetry.io/otel/log/noop"
-	sdklog "go.opentelemetry.io/otel/sdk/log"
+	logotel "go.opentelemetry.io/otel/log"
+	logotelglobal"go.opentelemetry.io/otel/log/global"
+	logsdk "go.opentelemetry.io/otel/sdk/log"
+	logsdknoop "go.opentelemetry.io/otel/log/noop"
 )
 
 // InitOtelLogging creates the OTLP log exporter and returns a shutdown function.
 // It chooses gRPC or HTTP exporter based on OTEL_EXPORTER_OTLP_PROTOCOL and skips
 // setup if OTEL_EXPORTER_OTLP_ENDPOINT is not set.
 func InitOtelLogging(ctx context.Context) (func(context.Context) error, error) {
-	var le sdklog.Exporter
+	var le logsdk.Exporter
 	var err error
 
 	endpoint := strings.TrimSpace(os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT"))
@@ -40,20 +40,20 @@ func InitOtelLogging(ctx context.Context) (func(context.Context) error, error) {
 	}
 
 	// default to noop providers
-	var lp otellog.LoggerProvider = noopsdklog.NewLoggerProvider()
+	var lp logotel.LoggerProvider = logsdknoop.NewLoggerProvider()
 
 	// use provider with configured exporter
 	if le != nil {
-		lp = sdklog.NewLoggerProvider(
-			sdklog.WithProcessor(sdklog.NewBatchProcessor(le)),
+		lp = logsdk.NewLoggerProvider(
+			logsdk.WithProcessor(logsdk.NewBatchProcessor(le)),
 		)
 	}
-	global.SetLoggerProvider(lp)
+	logotelglobal.SetLoggerProvider(lp)
 
 	log_shutdown := func(ctx context.Context) error {
 		slog.Info("Shutting down OTEL")
-		if sdkProv, ok := lp.(*sdklog.LoggerProvider); ok && sdkProv != nil {
-			return sdkProv.Shutdown(ctx)
+		if logsdkProvider, ok := lp.(*logsdk.LoggerProvider); ok && logsdkProvider != nil {
+			return logsdkProvider.Shutdown(ctx)
 		}
 		return nil
 	}
