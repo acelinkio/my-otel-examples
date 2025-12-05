@@ -30,6 +30,10 @@ func main() {
 
 	e := echo.New()
 	e.Logger.SetOutput(logger)
+
+	// old logger middleware
+	//e.Use(middleware.Logger())
+
 	// using example from https://echo.labstack.com/docs/middleware/logger#examples
 	e.Use(middleware.RequestLoggerWithConfig(middleware.RequestLoggerConfig{
     LogStatus:   true,
