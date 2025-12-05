@@ -31,20 +31,19 @@ import (
 	traceotelnoop "go.opentelemetry.io/otel/trace/noop"
 )
 
-func SetupOtel(ctx context.Context) (func(context.Context) error, error) {
+func SetupOtel(ctx context.Context, servicename string) (func(context.Context) error, error) {
 	var le logsdk.Exporter
 	var me metricsdk.Exporter
 	var te tracesdk.SpanExporter
 	var err error
 
-	serviceName := strings.TrimSpace(os.Getenv("OTEL_SERVICE_NAME"))
-	if serviceName == "" {
-		serviceName = "example"
+	if os.Getenv("OTEL_SERVICE_NAME") != "" {
+		servicename = strings.TrimSpace(os.Getenv("OTEL_SERVICE_NAME"))
 	}
 
 	res, err := resource.New(
 		ctx,
-		resource.WithAttributes(semconv.ServiceNameKey.String(serviceName)),
+		resource.WithAttributes(semconv.ServiceNameKey.String(servicename)),
 		resource.WithFromEnv(),
 		resource.WithTelemetrySDK(),
 		resource.WithProcess(),

@@ -7,6 +7,7 @@ import (
 
 func main() {
 	ctx := context.Background()
+	app_name := "go-echo"
 
 	logger, _, err := SetupLogger(ctx)
 	if err != nil {
@@ -14,7 +15,7 @@ func main() {
 	}
 	defer logger.Sync()
 
-	cleanup, err := SetupOtel(ctx)
+	cleanup, err := SetupOtel(ctx, app_name)
 	if err != nil {
 		slog.Error("otel init", "err", err)
 	}
