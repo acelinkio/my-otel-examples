@@ -31,18 +31,20 @@ import (
 	traceotelnoop "go.opentelemetry.io/otel/trace/noop"
 )
 
-// InitOtelLogging creates the OTLP log exporter and returns a shutdown function.
-// It chooses gRPC or HTTP exporter based on OTEL_EXPORTER_OTLP_PROTOCOL and skips
-// setup if OTEL_EXPORTER_OTLP_ENDPOINT is not set.
 func SetupOtel(ctx context.Context) (func(context.Context) error, error) {
 	var le logsdk.Exporter
 	var me metricsdk.Exporter
 	var te tracesdk.SpanExporter
 	var err error
 
+	serviceName := strings.TrimSpace(os.Getenv("OTEL_SERVICE_NAME"))
+	if serviceName == "" {
+		serviceName = "example"
+	}
+
 	res, err := resource.New(
 		ctx,
-		resource.WithAttributes(semconv.ServiceNameKey.String("example")),
+		resource.WithAttributes(semconv.ServiceNameKey.String(serviceName)),
 		resource.WithFromEnv(),
 		resource.WithTelemetrySDK(),
 		resource.WithProcess(),
