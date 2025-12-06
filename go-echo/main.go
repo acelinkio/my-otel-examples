@@ -13,7 +13,6 @@ func main() {
 	if err != nil {
 		slog.Error("logger init", "err", err)
 	}
-	defer logger.Sync()
 
 	cleanup, err := SetupOtel(ctx, app_name)
 	if err != nil {

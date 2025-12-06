@@ -10,14 +10,8 @@ import (
 	logotelglobal "go.opentelemetry.io/otel/log/global"
 )
 
-// SlogAdapter embeds slog.Logger and adds a Sync method so callers that expect
-// a zap-like logger can still call Sync().
 type SlogAdapter struct {
 	*slog.Logger
-}
-
-func (a *SlogAdapter) Sync() error {
-	return nil
 }
 
 // add Write so SlogAdapter satisfies io.Writer (Echo's logger output)
