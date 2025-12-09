@@ -1,0 +1,31 @@
+# bun-minimal
+
+To install dependencies:
+
+```bash
+bun install
+```
+
+To run:
+
+```bash
+bun run index.ts
+```
+
+This project was created using `bun init` in bun v1.3.3. [Bun](https://bun.com) is a fast all-in-one JavaScript runtime.
+
+
+# notes
+
+
+## reference for Kyoo
+https://github.com/zoriya/Kyoo/pull/1161/files
+
+
+## otel doesn't work
+https://github.com/oven-sh/bun/issues/3775#issuecomment-3473755225
+https://github.com/oven-sh/bun/pull/24063
+
+## bun example of functional
+https://github.com/open-telemetry/opentelemetry-js/issues/5260
+https://github.com/pichlermarc/repro-5260/tree/using-latest-version
