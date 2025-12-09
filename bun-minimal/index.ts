@@ -3,13 +3,13 @@ import index from './index.html';
 
 import {
   LoggerProvider,
-  SimpleLogRecordProcessor,
+  BatchLogRecordProcessor,
 } from '@opentelemetry/sdk-logs';
 import { OTLPLogExporter } from '@opentelemetry/exporter-logs-otlp-grpc';
 
 const loggerExporter = new OTLPLogExporter();
 const loggerProvider = new LoggerProvider({
-  processors: [new SimpleLogRecordProcessor(loggerExporter)]
+  processors: [new BatchLogRecordProcessor(loggerExporter)]
 });
 
 let server: ReturnType<typeof Bun.serve> | undefined;
