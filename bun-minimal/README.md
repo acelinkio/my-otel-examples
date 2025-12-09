@@ -17,6 +17,14 @@ This project was created using `bun init` in bun v1.3.3. [Bun](https://bun.com) 
 
 # notes
 
+## good search for stuff
+https://open-telemetry.github.io/opentelemetry-js/modules/_opentelemetry_sdk-logs.html
+
+## official example
+https://github.com/open-telemetry/opentelemetry-js/blob/main/experimental/examples/logs/index.ts
+https://open-telemetry.github.io/opentelemetry-js/modules/_opentelemetry_exporter-logs-otlp-grpc.html
+
+note some reason BatchRecordProcessor is not loading
 
 ## reference for Kyoo
 https://github.com/zoriya/Kyoo/pull/1161/files
