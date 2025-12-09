@@ -5,8 +5,8 @@ const server = Bun.serve({
   port: 8025,
   routes: {
     "/": index, 
-    "/f": () => { 
-      const body = figlet.textSync('Bun!'); 
+    "/q": () => { 
+      const body = figlet.textSync('Bun123!'); 
       return new Response(body); 
     } 
   }
