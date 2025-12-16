@@ -15,6 +15,19 @@ await configure({
 
 const logger = getLogger();
 
+logger.warn("acelink1", { event: "acelink1" });
+logger.info("User login successful", {
+  userId: 444, 
+  method: "oauth", 
+  loginTime: new Date() 
+});
+logger.info("User {username} (ID: {userId}) logged in at {loginTime}", {
+  userId: 123456,
+  username: "johndoe",
+  loginTime: new Date(),
+});
+
+
 let server: ReturnType<typeof Bun.serve> | undefined;
 
 ['SIGINT', 'SIGTERM'].forEach(signal => {
@@ -29,12 +42,6 @@ let server: ReturnType<typeof Bun.serve> | undefined;
   });
 });
 
-logger.warn("User {username} (ID: {userId}) logged in at {loginTime}", {
-  userId: 123456,
-  username: "johndoe",
-  loginTime: new Date(),
-});
-
 server = Bun.serve({
   port: 8025,
   routes: {
@@ -45,6 +52,3 @@ server = Bun.serve({
     } 
   }
 });
-
-logger.info("acelink1", { event: "acelink1" });
-logger.info("Listening on {url}", { url: server?.url });
