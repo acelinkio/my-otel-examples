@@ -15,10 +15,21 @@ export async function setupLogging() {
           record => levelFilter(record)
         );
       })(),
-      otel: getOpenTelemetrySink(),
+      filteredOtel: (() => {
+        const minLevelRaw = (process.env.OTEL_LOG_LEVEL ?? "info").toLowerCase();
+        //handles aliasing like 'warn' to 'warning'
+        const aliasMap: Record<string, string> = { warn: "warning" };
+        const minLevel = aliasMap[minLevelRaw] ?? minLevelRaw;
+        const levelFilter = getLevelFilter(parseLogLevel(minLevel));
+        return withFilter(
+          getOpenTelemetrySink(),
+          record => levelFilter(record)
+        );
+      })(),
+      //otel: getOpenTelemetrySink(),
     },
     loggers: [
-      { category: [], sinks: ["filteredConsole", "otel"], lowestLevel: "debug" },
+      { category: [], sinks: ["filteredConsole", "filteredOtel"] },
     ],
   });
 }
