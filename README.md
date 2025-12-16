@@ -6,12 +6,7 @@ look at the devspace.yaml for how setup happens
 
 
 # todo
-## vscode remote-ssh extension
-* create issue for better handling remote scp/ssh
-## devspace
-* create issue for better handling .ssh/config to allow using relative paths
 ## bun-minimal
-* add log filtering for stdout
 * add metrics
 * add traces
 
