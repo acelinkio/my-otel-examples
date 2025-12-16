@@ -1,4 +1,4 @@
-# python-otel-example
+# my-otel-examples
 example repo for testing otel in a few different languages/projects
 
 # running
