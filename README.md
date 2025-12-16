@@ -8,6 +8,7 @@ look at the devspace.yaml for how setup happens
 # todo
 ## bun-minimal
 * add log filtering for stdout
+* add log filtering for certain paths /health & /ready
 * add metrics
 * add traces
 
