@@ -1,25 +1,16 @@
-import figlet from 'figlet';
 import index from './index.html';
-import { configure, getLogger, getConsoleSink } from "@logtape/logtape";
-import { getOpenTelemetrySink } from "@logtape/otel";
+import { setupLogging, getLogger } from './logger';
+import { startServer, attachGracefulShutdown, routes } from './server';
 
-await configure({
-  sinks: {
-    console: getConsoleSink(),
-    otel: getOpenTelemetrySink(),
-  },
-  loggers: [
-    { category: [], sinks: ["console", "otel"], lowestLevel: "debug" },
-  ],
-});
+await setupLogging();
 
 const logger = getLogger();
 
 logger.warn("acelink1", { event: "acelink1" });
 logger.info("User login successful", {
-  userId: 444, 
-  method: "oauth", 
-  loginTime: new Date() 
+  userId: 444,
+  method: "oauth",
+  loginTime: new Date()
 });
 logger.info("User {username} (ID: {userId}) logged in at {loginTime}", {
   userId: 123456,
@@ -27,28 +18,5 @@ logger.info("User {username} (ID: {userId}) logged in at {loginTime}", {
   loginTime: new Date(),
 });
 
-
-let server: ReturnType<typeof Bun.serve> | undefined;
-
-['SIGINT', 'SIGTERM'].forEach(signal => {
-  process.on(signal, async () => {
-    try {
-      server?.stop();        // stop Bun server
-      process.exit(0);       // exit process
-    } catch (err) {
-      console.error(err);
-      process.exit(1);
-    }
-  });
-});
-
-server = Bun.serve({
-  port: 8025,
-  routes: {
-    "/": index, 
-    "/q": () => { 
-      const body = figlet.textSync('Bun123!'); 
-      return new Response(body); 
-    } 
-  }
-});
+const server = startServer(index, routes);
+attachGracefulShutdown(server);
