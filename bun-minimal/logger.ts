@@ -1,5 +1,5 @@
 import { configure, getLogger, getConsoleSink, withFilter, getLevelFilter, parseLogLevel } from "@logtape/logtape";
-import { getOpenTelemetrySink } from "@logtape/otel";
+import { getOpenTelemetrySink } from "@logtape/otel"; // may want to write our own setup.  Uses simple instead of batch proocessing
 
 export async function setupLogging() {
   await configure({
@@ -26,7 +26,6 @@ export async function setupLogging() {
           record => levelFilter(record)
         );
       })(),
-      //otel: getOpenTelemetrySink(),
     },
     loggers: [
       { category: [], sinks: ["filteredConsole", "filteredOtel"] },
