@@ -38,6 +38,7 @@ dev:
     imageSelector: docker.io/busybox:1.28
     devImage: docker.io/oven/bun:latest
     workingDir: /app
+    ssh: {}
     sync:
       - path: .:/app
         excludePaths:
@@ -52,6 +53,6 @@ dev:
       - bash
       - -c
       - |
-        sleep 100000
+        apt update && apt install -y curl && sleep 100000
     ports:
       - port: "8025"
