@@ -12,12 +12,12 @@ look at the devspace.yaml for how setup happens
 * create issue for better handling .ssh/config to allow using relative paths
 ## bun-minimal
 * add log filtering for stdout
-* add log filtering for certain paths /health & /ready
 * add metrics
 * add traces
 
 ## bun-elysia
 * create example using elysia
+* add log filtering for certain paths /health & /ready
 
 ## bun-expo
 * create example using expo
