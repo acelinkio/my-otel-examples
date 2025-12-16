@@ -6,9 +6,7 @@ import { getOpenTelemetrySink } from "@logtape/otel";
 await configure({
   sinks: {
     console: getConsoleSink(),
-    otel: getOpenTelemetrySink({
-      serviceName: "my-service123",
-    }),
+    otel: getOpenTelemetrySink(),
   },
   loggers: [
     { category: [], sinks: ["console", "otel"], lowestLevel: "debug" },
@@ -31,7 +29,7 @@ let server: ReturnType<typeof Bun.serve> | undefined;
   });
 });
 
-logger.info("User {username} (ID: {userId}) logged in at {loginTime}", {
+logger.warn("User {username} (ID: {userId}) logged in at {loginTime}", {
   userId: 123456,
   username: "johndoe",
   loginTime: new Date(),
