@@ -1,13 +1,28 @@
-import {
-  BatchSpanProcessor,
-  WebTracerProvider,
-} from '@opentelemetry/sdk-trace-web';
 import { OTLPTraceExporter as OLTPTraceExporterHTTPjson } from '@opentelemetry/exporter-trace-otlp-http';
 import { OTLPTraceExporter as OLTPTraceExporterHTTPprotobuf } from '@opentelemetry/exporter-trace-otlp-proto';
 import { OTLPTraceExporter as OLTPTraceExporterGRPC } from '@opentelemetry/exporter-trace-otlp-grpc';
+import { OTLPMetricExporter as OLTPMetricsExporterHTTPjson } from '@opentelemetry/exporter-metrics-otlp-http';
+import { OTLPMetricExporter as OLTPMetricsExporterHTTPprotobuf } from '@opentelemetry/exporter-metrics-otlp-proto';
+import { OTLPMetricExporter as OLTPMetricsExporterGRPC } from '@opentelemetry/exporter-metrics-otlp-grpc';
+
+import { MeterProvider, PeriodicExportingMetricReader } from '@opentelemetry/sdk-metrics';
+import { BatchSpanProcessor, WebTracerProvider } from '@opentelemetry/sdk-trace-web';
 
 class SimpleNoopTracerProvider {
   register(): void {}
+}
+
+function createNoopMeter() {
+  const noopInstrument = () => ({ add: (_v: number, _attrs?: Record<string, unknown>) => {}, record: (_v: number, _attrs?: Record<string, unknown>) => {}, observe: (_v: number, _attrs?: Record<string, unknown>) => {} });
+  return {
+    createCounter: () => ({ add: (_v: number, _attrs?: Record<string, unknown>) => {} }),
+    createUpDownCounter: () => ({ add: (_v: number, _attrs?: Record<string, unknown>) => {} }),
+    createHistogram: () => ({ record: (_v: number, _attrs?: Record<string, unknown>) => {} }),
+    createObservableGauge: (_name: string, _opts?: any, _callback?: any) => ({}),
+    createObservableCounter: (_name: string, _opts?: any, _callback?: any) => ({}),
+    // convenience for tests
+    noopInstrument,
+  } as any;
 }
 
 // used to get env vars in both node and browser-like environments
@@ -20,20 +35,25 @@ function getEnv(name: string): string | undefined {
 }
 
 const protocol = (getEnv('OTEL_EXPORTER_OTLP_PROTOCOL') || '').toLowerCase();
+export let meter: any;
 
 if (! getEnv('OTEL_EXPORTER_OTLP_ENDPOINT')) {
   const tenoop = new SimpleNoopTracerProvider();
   tenoop.register();
+  meter = createNoopMeter();
 } else {
   let te: any;
+  let me: any;
 
   if (protocol === 'grpc') {
     te = new OLTPTraceExporterGRPC();
+    me = new OLTPMetricsExporterGRPC();
   } else if (protocol === 'http/json' || protocol === 'http_json' || protocol === 'httpjson') {
     te = new OLTPTraceExporterHTTPjson();
+    me = new OLTPMetricsExporterHTTPjson();
   } else {
     te = new OLTPTraceExporterHTTPprotobuf();
-  }
+    me = new OLTPMetricsExporterHTTPprotobuf();}
 
   const tp = new WebTracerProvider({
     spanProcessors: [
@@ -46,5 +66,13 @@ if (! getEnv('OTEL_EXPORTER_OTLP_ENDPOINT')) {
     ],
   });
 
+  const mp = new MeterProvider({
+    readers: [
+      new PeriodicExportingMetricReader({
+        exporter: me,
+      }),
+    ],
+  });
+  meter = mp.getMeter('local-test-meter');
   tp.register();
 }

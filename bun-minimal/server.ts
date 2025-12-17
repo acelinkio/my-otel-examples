@@ -1,4 +1,7 @@
 import figlet from 'figlet';
+import { meter } from './otel';
+
+const counter = meter.createCounter('requests', { description: 'Request count' });
 
 export function startServer(indexHtml: any, extraRoutes: Record<string, any> = {}) {
   const routes = {
@@ -29,6 +32,7 @@ export function attachGracefulShutdown(server: ReturnType<typeof Bun.serve>) {
 
 export function qHandler() {
   const body = figlet.textSync('Bun123!');
+  counter.add(1, { route: '/q' });
   return new Response(body);
 }
 
