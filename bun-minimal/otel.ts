@@ -10,6 +10,7 @@ class SimpleNoopTracerProvider {
   register(): void {}
 }
 
+// used to get env vars in both node and browser-like environments
 function getEnv(name: string): string | undefined {
   if (typeof process !== 'undefined' && (process as any).env) {
     return (process as any).env[name];
