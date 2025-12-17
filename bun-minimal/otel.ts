@@ -21,22 +21,22 @@ function getEnv(name: string): string | undefined {
 const protocol = (getEnv('OTEL_EXPORTER_OTLP_PROTOCOL') || '').toLowerCase();
 
 if (! getEnv('OTEL_EXPORTER_OTLP_ENDPOINT')) {
-  const noop = new SimpleNoopTracerProvider();
-  noop.register();
+  const tenoop = new SimpleNoopTracerProvider();
+  tenoop.register();
 } else {
-  let exporter: any;
+  let te: any;
 
   if (protocol === 'grpc') {
-    exporter = new OLTPTraceExporterGRPC();
+    te = new OLTPTraceExporterGRPC();
   } else if (protocol === 'http/json' || protocol === 'http_json' || protocol === 'httpjson') {
-    exporter = new OLTPTraceExporterHTTPjson();
+    te = new OLTPTraceExporterHTTPjson();
   } else {
-    exporter = new OLTPTraceExporterHTTPprotobuf();
+    te = new OLTPTraceExporterHTTPprotobuf();
   }
 
-  const provider = new WebTracerProvider({
+  const tp = new WebTracerProvider({
     spanProcessors: [
-      new BatchSpanProcessor(exporter, {
+      new BatchSpanProcessor(te, {
         maxQueueSize: 100,
         maxExportBatchSize: 10,
         scheduledDelayMillis: 500,
@@ -45,5 +45,5 @@ if (! getEnv('OTEL_EXPORTER_OTLP_ENDPOINT')) {
     ],
   });
 
-  provider.register();
+  tp.register();
 }
