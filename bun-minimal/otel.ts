@@ -7,7 +7,9 @@ import { OTLPMetricExporter as OLTPMetricsExporterGRPC } from '@opentelemetry/ex
 
 import { MeterProvider, PeriodicExportingMetricReader } from '@opentelemetry/sdk-metrics';
 import { metrics } from '@opentelemetry/api';
-import { BatchSpanProcessor, WebTracerProvider } from '@opentelemetry/sdk-trace-web';
+// web uses a different api
+//import { BatchSpanProcessor, WebTracerProvider } from '@opentelemetry/sdk-trace-web';
+import { BatchSpanProcessor, NodeTracerProvider } from '@opentelemetry/sdk-trace-node';
 
 class SimpleNoopTracerProvider {
   register(): void {}
@@ -43,7 +45,7 @@ if (! getEnv('OTEL_EXPORTER_OTLP_ENDPOINT')) {
     te = new OLTPTraceExporterHTTPprotobuf();
     me = new OLTPMetricsExporterHTTPprotobuf();}
 
-  const tp = new WebTracerProvider({
+  const tp = new NodeTracerProvider({
     spanProcessors: [
       new BatchSpanProcessor(te, {
         maxQueueSize: 100,
@@ -58,6 +60,7 @@ if (! getEnv('OTEL_EXPORTER_OTLP_ENDPOINT')) {
     readers: [
       new PeriodicExportingMetricReader({
         exporter: me,
+        exportIntervalMillis: 1000,
       }),
     ],
   });
