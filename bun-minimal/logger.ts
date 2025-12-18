@@ -9,10 +9,9 @@ export async function setupLogging() {
         //handles aliasing like 'warn' to 'warning'
         const aliasMap: Record<string, string> = { warn: "warning" };
         const minLevel = aliasMap[minLevelRaw] ?? minLevelRaw;
-        const levelFilter = getLevelFilter(parseLogLevel(minLevel));
         return withFilter(
           getConsoleSink(),
-          record => levelFilter(record)
+          getLevelFilter(parseLogLevel(minLevel))
         );
       })(),
       filteredOtel: (() => {
@@ -20,10 +19,9 @@ export async function setupLogging() {
         //handles aliasing like 'warn' to 'warning'
         const aliasMap: Record<string, string> = { warn: "warning" };
         const minLevel = aliasMap[minLevelRaw] ?? minLevelRaw;
-        const levelFilter = getLevelFilter(parseLogLevel(minLevel));
         return withFilter(
           getOpenTelemetrySink(),
-          record => levelFilter(record)
+          getLevelFilter(parseLogLevel(minLevel))
         );
       })(),
     },
