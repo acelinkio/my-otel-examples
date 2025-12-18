@@ -1,5 +1,8 @@
 import { configure, getLogger, getConsoleSink, withFilter, getLevelFilter, parseLogLevel } from "@logtape/logtape";
-import { getOpenTelemetrySink } from "@logtape/otel"; // may want to write our own setup.  Uses simple instead of batch proocessing
+import { getOpenTelemetrySink } from "@logtape/otel";
+import { logs } from '@opentelemetry/api-logs';
+
+const loggerProvider = logs.getLoggerProvider();
 
 export async function setupLogging() {
   await configure({
@@ -20,7 +23,7 @@ export async function setupLogging() {
         const aliasMap: Record<string, string> = { warn: "warning" };
         const minLevel = aliasMap[minLevelRaw] ?? minLevelRaw;
         return withFilter(
-          getOpenTelemetrySink(),
+          getOpenTelemetrySink({ loggerProvider } ),
           getLevelFilter(parseLogLevel(minLevel))
         );
       })(),

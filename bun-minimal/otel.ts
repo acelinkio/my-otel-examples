@@ -1,15 +1,20 @@
-import { OTLPTraceExporter as OLTPTraceExporterHTTPjson } from '@opentelemetry/exporter-trace-otlp-http';
-import { OTLPTraceExporter as OLTPTraceExporterHTTPprotobuf } from '@opentelemetry/exporter-trace-otlp-proto';
-import { OTLPTraceExporter as OLTPTraceExporterGRPC } from '@opentelemetry/exporter-trace-otlp-grpc';
+import { OTLPLogExporter as OLTPLogExporterGRPC } from '@opentelemetry/exporter-logs-otlp-grpc';
+import { OTLPLogExporter as OLTPLogExporterHTTPjson } from '@opentelemetry/exporter-logs-otlp-http';
+import { OTLPLogExporter as OLTPLogExporterHTTPprotobuf } from '@opentelemetry/exporter-logs-otlp-proto';
+import { OTLPMetricExporter as OLTPMetricsExporterGRPC } from '@opentelemetry/exporter-metrics-otlp-grpc';
 import { OTLPMetricExporter as OLTPMetricsExporterHTTPjson } from '@opentelemetry/exporter-metrics-otlp-http';
 import { OTLPMetricExporter as OLTPMetricsExporterHTTPprotobuf } from '@opentelemetry/exporter-metrics-otlp-proto';
-import { OTLPMetricExporter as OLTPMetricsExporterGRPC } from '@opentelemetry/exporter-metrics-otlp-grpc';
+import { OTLPTraceExporter as OLTPTraceExporterGRPC } from '@opentelemetry/exporter-trace-otlp-grpc';
+import { OTLPTraceExporter as OLTPTraceExporterHTTPjson } from '@opentelemetry/exporter-trace-otlp-http';
+import { OTLPTraceExporter as OLTPTraceExporterHTTPprotobuf } from '@opentelemetry/exporter-trace-otlp-proto';
 
+import { LoggerProvider, BatchLogRecordProcessor } from '@opentelemetry/sdk-logs';
 import { MeterProvider, PeriodicExportingMetricReader } from '@opentelemetry/sdk-metrics';
-import { metrics } from '@opentelemetry/api';
 // web uses a different api
 //import { BatchSpanProcessor, WebTracerProvider } from '@opentelemetry/sdk-trace-web';
 import { BatchSpanProcessor, NodeTracerProvider } from '@opentelemetry/sdk-trace-node';
+import { logs } from '@opentelemetry/api-logs';
+import { metrics } from '@opentelemetry/api';
 
 class SimpleNoopTracerProvider {
   register(): void {}
@@ -32,18 +37,35 @@ if (! getEnv('OTEL_EXPORTER_OTLP_ENDPOINT')) {
   tenoop.register();
   meter = metrics.getMeter('local-test-meter');
 } else {
-  let te: any;
+  let le: any;
   let me: any;
+  let te: any;
 
   if (protocol === 'grpc') {
-    te = new OLTPTraceExporterGRPC();
+    le = new OLTPLogExporterGRPC();
     me = new OLTPMetricsExporterGRPC();
+    te = new OLTPTraceExporterGRPC();
   } else if (protocol === 'http/json' || protocol === 'http_json' || protocol === 'httpjson') {
-    te = new OLTPTraceExporterHTTPjson();
+    le = new OLTPLogExporterHTTPjson();
     me = new OLTPMetricsExporterHTTPjson();
+    te = new OLTPTraceExporterHTTPjson();
   } else {
-    te = new OLTPTraceExporterHTTPprotobuf();
+    le = new OLTPLogExporterHTTPprotobuf();
     me = new OLTPMetricsExporterHTTPprotobuf();}
+    te = new OLTPTraceExporterHTTPprotobuf();
+
+  const lp = new LoggerProvider({
+    processors: [new BatchLogRecordProcessor(le)]
+  });
+
+  const mp = new MeterProvider({
+    readers: [
+      new PeriodicExportingMetricReader({
+        exporter: me,
+        exportIntervalMillis: 5000,
+      }),
+    ],
+  });
 
   const tp = new NodeTracerProvider({
     spanProcessors: [
@@ -55,15 +77,9 @@ if (! getEnv('OTEL_EXPORTER_OTLP_ENDPOINT')) {
       }),
     ],
   });
-
-  const mp = new MeterProvider({
-    readers: [
-      new PeriodicExportingMetricReader({
-        exporter: me,
-        exportIntervalMillis: 5000,
-      }),
-    ],
-  });
+  logs.setGlobalLoggerProvider(lp);
+  // wip replaceing metrics
+  metrics.setGlobalMeterProvider(mp);
   meter = mp.getMeter('local-test-meter');
   tp.register();
 }
