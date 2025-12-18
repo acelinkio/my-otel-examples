@@ -21,12 +21,6 @@ logger.info("User {username} (ID: {userId}) logged in at {loginTime}", {
   loginTime: new Date(),
 });
 
-const server = startServer(index, routes);
-attachGracefulShutdown(server);
-
-// const testmeter = metricapi.getMeterProvider().getMeter("local-test-meter");
-// const counter = testmeter.createCounter('requests', { description: 'Request count' });
-
 // Create a test span to verify OTEL setup
 const tracer = trace.getTracerProvider().getTracer('local-test-tracer');
 tracer.startActiveSpan('test-span', span => {
@@ -35,3 +29,7 @@ tracer.startActiveSpan('test-span', span => {
     span.end();
   }, 200);
 });
+
+
+const server = startServer(index, routes);
+attachGracefulShutdown(server);
