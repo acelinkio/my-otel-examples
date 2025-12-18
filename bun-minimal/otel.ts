@@ -13,8 +13,8 @@ import { MeterProvider, PeriodicExportingMetricReader } from '@opentelemetry/sdk
 // web uses a different api
 //import { BatchSpanProcessor, WebTracerProvider } from '@opentelemetry/sdk-trace-web';
 import { BatchSpanProcessor, NodeTracerProvider } from '@opentelemetry/sdk-trace-node';
-import { logs } from '@opentelemetry/api-logs';
-import { metrics, trace } from '@opentelemetry/api';
+import { logs as logapi } from '@opentelemetry/api-logs';
+import { metrics as metricapi, trace as traceapi } from '@opentelemetry/api';
 
 // used to get env vars in both node and browser-like environments
 function getEnv(name: string): string | undefined {
@@ -28,8 +28,10 @@ function getEnv(name: string): string | undefined {
 const protocol = (getEnv('OTEL_EXPORTER_OTLP_PROTOCOL') || '').toLowerCase();
 
 if (! getEnv('OTEL_EXPORTER_OTLP_ENDPOINT')) {
-  logs.setGlobalLoggerProvider(new LoggerProvider());
-  metrics.setGlobalMeterProvider(new MeterProvider());
+  // use noop providers
+  logapi.setGlobalLoggerProvider(new LoggerProvider());
+  metricapi.setGlobalMeterProvider(new MeterProvider());
+  traceapi.setGlobalTracerProvider(new NodeTracerProvider());
 } else {
   let le: any;
   let me: any;
@@ -71,7 +73,7 @@ if (! getEnv('OTEL_EXPORTER_OTLP_ENDPOINT')) {
       }),
     ],
   });
-  logs.setGlobalLoggerProvider(lp);
-  metrics.setGlobalMeterProvider(mp);
-  trace.setGlobalTracerProvider(tp);
+  logapi.setGlobalLoggerProvider(lp);
+  metricapi.setGlobalMeterProvider(mp);
+  traceapi.setGlobalTracerProvider(tp);
 }

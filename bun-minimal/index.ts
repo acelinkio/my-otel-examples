@@ -2,7 +2,7 @@ import './otel';
 import index from './index.html';
 import { setupLogging, getLogger } from './logger';
 import { startServer, attachGracefulShutdown, routes } from './server';
-import { trace } from '@opentelemetry/api';
+import { trace as traceapi } from '@opentelemetry/api';
 
 await setupLogging();
 
@@ -22,7 +22,7 @@ logger.info("User {username} (ID: {userId}) logged in at {loginTime}", {
 });
 
 // Create a test span to verify OTEL setup
-const tracer = trace.getTracerProvider().getTracer('local-test-tracer');
+const tracer = traceapi.getTracerProvider().getTracer('local-test-tracer');
 tracer.startActiveSpan('test-span', span => {
   span.addEvent('test-event', { foo: 'bar' });
   setTimeout(() => {
