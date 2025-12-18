@@ -47,8 +47,9 @@ if (! getEnv('OTEL_EXPORTER_OTLP_ENDPOINT')) {
     te = new OLTPTraceExporterHTTPjson();
   } else {
     le = new OLTPLogExporterHTTPprotobuf();
-    me = new OLTPMetricsExporterHTTPprotobuf();}
+    me = new OLTPMetricsExporterHTTPprotobuf();
     te = new OLTPTraceExporterHTTPprotobuf();
+  }
 
   const lp = new LoggerProvider({
     processors: [new BatchLogRecordProcessor(le)]
