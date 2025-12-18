@@ -60,7 +60,7 @@ if (! getEnv('OTEL_EXPORTER_OTLP_ENDPOINT')) {
     readers: [
       new PeriodicExportingMetricReader({
         exporter: me,
-        exportIntervalMillis: 1000,
+        exportIntervalMillis: 5000,
       }),
     ],
   });

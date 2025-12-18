@@ -7,8 +7,7 @@ look at the devspace.yaml for how setup happens
 
 # todo
 ## bun-minimal
-* add metrics
-* add traces
+* switch to using my own exporter, do not like simplelogprocessor
 
 ## bun-elysia
 * create example using elysia
