@@ -1,7 +1,8 @@
 import figlet from 'figlet';
-import { meter } from './otel';
+import { metrics as metricapi} from '@opentelemetry/api';
 
-const counter = meter.createCounter('requests', { description: 'Request count' });
+const testmeter = metricapi.getMeterProvider().getMeter("local-test-meter");
+const counter = testmeter.createCounter('requests', { description: 'Request count' });
 
 export function startServer(indexHtml: any, extraRoutes: Record<string, any> = {}) {
   const routes = {

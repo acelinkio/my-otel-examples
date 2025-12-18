@@ -15,6 +15,16 @@ bun run index.ts
 This project was created using `bun init` in bun v1.3.3. [Bun](https://bun.com) is a fast all-in-one JavaScript runtime.
 
 
+
+```sh
+# OTEL_EXPORTER_OTLP_PROTOCOL=grpc
+# OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector.opentelemetry.svc.cluster.local:4317
+
+unset OTEL_EXPORTER_OTLP_PROTOCOL OTEL_EXPORTER_OTLP_ENDPOINT
+OTEL_EXPORTER_OTLP_PROTOCOL=grpc OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector.opentelemetry.svc.cluster.local:4317 bun dev
+
+```
+
 # notes
 
 ## good search for stuff

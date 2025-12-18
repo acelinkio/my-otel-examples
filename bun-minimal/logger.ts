@@ -1,8 +1,8 @@
 import { configure, getLogger, getConsoleSink, withFilter, getLevelFilter, parseLogLevel } from "@logtape/logtape";
 import { getOpenTelemetrySink } from "@logtape/otel";
-import { logs } from '@opentelemetry/api-logs';
+import { logs as logapi } from '@opentelemetry/api-logs';
 
-const loggerProvider = logs.getLoggerProvider();
+const loggerProvider = logapi.getLoggerProvider();
 
 export async function setupLogging() {
   await configure({

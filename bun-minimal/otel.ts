@@ -16,10 +16,6 @@ import { BatchSpanProcessor, NodeTracerProvider } from '@opentelemetry/sdk-trace
 import { logs } from '@opentelemetry/api-logs';
 import { metrics } from '@opentelemetry/api';
 
-class SimpleNoopTracerProvider {
-  register(): void {}
-}
-
 // used to get env vars in both node and browser-like environments
 function getEnv(name: string): string | undefined {
   if (typeof process !== 'undefined' && (process as any).env) {
@@ -30,12 +26,10 @@ function getEnv(name: string): string | undefined {
 }
 
 const protocol = (getEnv('OTEL_EXPORTER_OTLP_PROTOCOL') || '').toLowerCase();
-export let meter: any;
 
 if (! getEnv('OTEL_EXPORTER_OTLP_ENDPOINT')) {
-  const tenoop = new SimpleNoopTracerProvider();
-  tenoop.register();
-  meter = metrics.getMeter('local-test-meter');
+  logs.setGlobalLoggerProvider(new LoggerProvider());
+  metrics.setGlobalMeterProvider(new MeterProvider());
 } else {
   let le: any;
   let me: any;
@@ -78,8 +72,6 @@ if (! getEnv('OTEL_EXPORTER_OTLP_ENDPOINT')) {
     ],
   });
   logs.setGlobalLoggerProvider(lp);
-  // wip replaceing metrics
   metrics.setGlobalMeterProvider(mp);
-  meter = mp.getMeter('local-test-meter');
   tp.register();
 }
