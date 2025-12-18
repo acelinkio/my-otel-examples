@@ -14,7 +14,7 @@ import { MeterProvider, PeriodicExportingMetricReader } from '@opentelemetry/sdk
 //import { BatchSpanProcessor, WebTracerProvider } from '@opentelemetry/sdk-trace-web';
 import { BatchSpanProcessor, NodeTracerProvider } from '@opentelemetry/sdk-trace-node';
 import { logs } from '@opentelemetry/api-logs';
-import { metrics } from '@opentelemetry/api';
+import { metrics, trace } from '@opentelemetry/api';
 
 // used to get env vars in both node and browser-like environments
 function getEnv(name: string): string | undefined {
@@ -73,5 +73,5 @@ if (! getEnv('OTEL_EXPORTER_OTLP_ENDPOINT')) {
   });
   logs.setGlobalLoggerProvider(lp);
   metrics.setGlobalMeterProvider(mp);
-  tp.register();
+  trace.setGlobalTracerProvider(tp);
 }
