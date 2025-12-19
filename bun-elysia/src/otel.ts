@@ -16,6 +16,16 @@ import { BatchSpanProcessor, NodeTracerProvider } from '@opentelemetry/sdk-trace
 import { logs as logapi } from '@opentelemetry/api-logs';
 import { metrics as metricapi, trace as traceapi } from '@opentelemetry/api';
 import { getLogger } from "@logtape/logtape";
+import { SDK_INFO } from '@opentelemetry/core';
+import { ATTR_SERVICE_NAME, ATTR_TELEMETRY_SDK_LANGUAGE, ATTR_TELEMETRY_SDK_NAME, ATTR_TELEMETRY_SDK_VERSION } from '@opentelemetry/semantic-conventions';
+import { resourceFromAttributes } from '@opentelemetry/resources';
+
+const resource = resourceFromAttributes({
+  [ATTR_SERVICE_NAME]: process.env.OTEL_SERVICE_NAME || 'bun-elysia',
+  [ATTR_TELEMETRY_SDK_LANGUAGE]: SDK_INFO[ATTR_TELEMETRY_SDK_LANGUAGE],
+  [ATTR_TELEMETRY_SDK_NAME]: SDK_INFO[ATTR_TELEMETRY_SDK_NAME],
+  [ATTR_TELEMETRY_SDK_VERSION]: SDK_INFO[ATTR_TELEMETRY_SDK_VERSION],
+});
 
 
 const logger = getLogger();
@@ -65,18 +75,20 @@ export function setupOtel() {
       break;
   }
 
-  let lp = new LoggerProvider()
-  let mp = new MeterProvider();
-  let tp = new NodeTracerProvider();
+  let lp = new LoggerProvider({ resource });
+  let mp = new MeterProvider({ resource });
+  let tp = new NodeTracerProvider({ resource });
 
   if (le) {
     lp = new LoggerProvider({
+      resource,
       processors: [new BatchLogRecordProcessor(le)]
     });
   }
 
   if (me) {
     mp = new MeterProvider({
+      resource,
       readers: [
         new PeriodicExportingMetricReader({
           exporter: me,
@@ -88,6 +100,7 @@ export function setupOtel() {
 
   if (te) {
     tp = new NodeTracerProvider({
+      resource,
       spanProcessors: [
         new BatchSpanProcessor(te, {
           maxQueueSize: 100,
