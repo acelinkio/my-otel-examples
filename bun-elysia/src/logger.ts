@@ -29,6 +29,7 @@ export async function setupLogging() {
       })(),
     },
     loggers: [
+      { category: ["logtape", "meta"], sinks: [], lowestLevel: "warning" },
       { category: [], sinks: ["filteredConsole", "filteredOtel"] },
     ],
   });
