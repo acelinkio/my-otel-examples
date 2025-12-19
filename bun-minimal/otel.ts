@@ -106,7 +106,6 @@ export function setupOtel() {
         }),
       ],
     });
-    tp.register();
   }
 
   logapi.setGlobalLoggerProvider(lp);
