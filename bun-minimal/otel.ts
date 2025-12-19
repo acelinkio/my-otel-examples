@@ -30,6 +30,7 @@ function getEnv(name: string): string | undefined {
 }
 
 export function setupOtel() {
+  logger.info("Configuring OTEL");
   const protocol = (getEnv('OTEL_EXPORTER_OTLP_PROTOCOL') || '').toLowerCase();
 
   let le: any;
