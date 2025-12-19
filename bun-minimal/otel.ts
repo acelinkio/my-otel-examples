@@ -20,25 +20,16 @@ import { getLogger } from "@logtape/logtape";
 
 const logger = getLogger();
 
-// used to get env vars in both node and browser-like environments
-function getEnv(name: string): string | undefined {
-  if (typeof process !== 'undefined' && (process as any).env) {
-    return (process as any).env[name];
-  }
-  const g = globalThis as any;
-  return g && g[name] ? g[name] : undefined;
-}
-
 export function setupOtel() {
   logger.info("Configuring OTEL");
-  const protocol = (getEnv('OTEL_EXPORTER_OTLP_PROTOCOL') || '').toLowerCase();
+  const protocol = (process.env.OTEL_EXPORTER_OTLP_PROTOCOL || '').toLowerCase();
 
   let le: any;
   let me: any;
   let te: any;
 
   switch (true) {
-    case !getEnv('OTEL_EXPORTER_OTLP_ENDPOINT'):
+    case ! process.env.OTEL_EXPORTER_OTLP_ENDPOINT:
       logger.info("Using OLTP type: {type}", {
         type: "noop",
       });
