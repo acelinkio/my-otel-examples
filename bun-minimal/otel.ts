@@ -27,35 +27,47 @@ function getEnv(name: string): string | undefined {
 
 const protocol = (getEnv('OTEL_EXPORTER_OTLP_PROTOCOL') || '').toLowerCase();
 
-if (! getEnv('OTEL_EXPORTER_OTLP_ENDPOINT')) {
-  // use noop providers
-  logapi.setGlobalLoggerProvider(new LoggerProvider());
-  metricapi.setGlobalMeterProvider(new MeterProvider());
-  traceapi.setGlobalTracerProvider(new NodeTracerProvider());
-} else {
-  let le: any;
-  let me: any;
-  let te: any;
+let le: any;
+let me: any;
+let te: any;
 
-  if (protocol === 'grpc') {
+switch (true) {
+  case !getEnv('OTEL_EXPORTER_OTLP_ENDPOINT'):
+    le = null;
+    me = null;
+    te = null;
+    break;
+  case protocol === 'grpc':
     le = new OLTPLogExporterGRPC();
     me = new OLTPMetricsExporterGRPC();
     te = new OLTPTraceExporterGRPC();
-  } else if (protocol === 'http/json' || protocol === 'http_json' || protocol === 'httpjson') {
+    break;
+  case protocol === 'http/json':
+  case protocol === 'http_json':
+  case protocol === 'httpjson':
     le = new OLTPLogExporterHTTPjson();
     me = new OLTPMetricsExporterHTTPjson();
     te = new OLTPTraceExporterHTTPjson();
-  } else {
+    break;
+  default:
     le = new OLTPLogExporterHTTPprotobuf();
     me = new OLTPMetricsExporterHTTPprotobuf();
     te = new OLTPTraceExporterHTTPprotobuf();
-  }
+    break;
+}
 
-  const lp = new LoggerProvider({
+let lp = new LoggerProvider()
+let mp = new MeterProvider();
+let tp = new NodeTracerProvider();
+
+if (le) {
+  lp = new LoggerProvider({
     processors: [new BatchLogRecordProcessor(le)]
   });
+}
 
-  const mp = new MeterProvider({
+if (me) {
+  mp = new MeterProvider({
     readers: [
       new PeriodicExportingMetricReader({
         exporter: me,
@@ -63,8 +75,10 @@ if (! getEnv('OTEL_EXPORTER_OTLP_ENDPOINT')) {
       }),
     ],
   });
+}
 
-  const tp = new NodeTracerProvider({
+if (te) {
+  tp = new NodeTracerProvider({
     spanProcessors: [
       new BatchSpanProcessor(te, {
         maxQueueSize: 100,
@@ -74,7 +88,8 @@ if (! getEnv('OTEL_EXPORTER_OTLP_ENDPOINT')) {
       }),
     ],
   });
-  logapi.setGlobalLoggerProvider(lp);
-  metricapi.setGlobalMeterProvider(mp);
-  traceapi.setGlobalTracerProvider(tp);
 }
+
+logapi.setGlobalLoggerProvider(lp);
+metricapi.setGlobalMeterProvider(mp);
+traceapi.setGlobalTracerProvider(tp);

@@ -7,8 +7,6 @@ look at the devspace.yaml for how setup happens
 
 # todo
 ## bun-minimal
-* move to using metrics global instead of passing metrics from api
-* make sure noop works for logger, metrics, & traces
 
 ## bun-elysia
 * create example using elysia
