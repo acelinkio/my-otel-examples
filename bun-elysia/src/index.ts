@@ -1,5 +1,5 @@
 import { Elysia } from "elysia";
-import { opentelemetry } from '@elysiajs/opentelemetry';
+import { opentelemetry, record as elysiaRecord } from '@elysiajs/opentelemetry';
 import { getLogger } from "@logtape/logtape";
 import { setupOtel } from './otel';
 import { setupLogging } from './logger';
@@ -13,7 +13,11 @@ const logger = getLogger();
 
 const app = new Elysia()
   .use(opentelemetry())
-  .get("/", () => "Hello Elysia")
+  .get("/", () => {
+    return elysiaRecord('testtrace', () => {
+      return "hello123"
+    })
+  })
   .listen(3000);
 
 logger.info("Elysia is running at {hostname}:{port}", {
