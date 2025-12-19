@@ -3,6 +3,7 @@ import { opentelemetry, record as elysiaRecord } from '@elysiajs/opentelemetry';
 import { getLogger } from "@logtape/logtape";
 import { setupOtel } from './otel';
 import { setupLogging } from './logger';
+import { elysiaLogger } from "@logtape/elysia";
 
 
 await setupLogging();
@@ -12,6 +13,11 @@ const logger = getLogger();
 // https://elysiajs.com/patterns/opentelemetry
 
 const app = new Elysia()
+	.use(elysiaLogger(
+		{
+			skip: (ctx) => ctx.path === "/api/health",
+		}
+	))
   .use(opentelemetry())
   .get("/", () => {
     return elysiaRecord('testtrace', () => {

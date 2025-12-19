@@ -1,6 +1,7 @@
 import { configure, getLogger, getConsoleSink, withFilter, getLevelFilter, parseLogLevel } from "@logtape/logtape";
 import { getOpenTelemetrySink } from "@logtape/otel";
 import { logs as logapi } from '@opentelemetry/api-logs';
+import { redactByField } from "@logtape/redaction";
 
 const loggerProvider = logapi.getLoggerProvider();
 
@@ -13,7 +14,10 @@ export async function setupLogging() {
         const aliasMap: Record<string, string> = { warn: "warning" };
         const minLevel = aliasMap[minLevelRaw] ?? minLevelRaw;
         return withFilter(
-          getConsoleSink(),
+          redactByField(getConsoleSink(), {
+            fieldPatterns: [/password/i, /secret/i],
+            action: () => "[REDACTED]"
+          }),
           getLevelFilter(parseLogLevel(minLevel))
         );
       })(),
@@ -23,7 +27,10 @@ export async function setupLogging() {
         const aliasMap: Record<string, string> = { warn: "warning" };
         const minLevel = aliasMap[minLevelRaw] ?? minLevelRaw;
         return withFilter(
-          getOpenTelemetrySink({ loggerProvider } ),
+          redactByField(getOpenTelemetrySink({ loggerProvider } ), {
+            fieldPatterns: [/password/i, /secret/i, /apikey/i],
+            action: () => "[REDACTED]"
+          }),
           getLevelFilter(parseLogLevel(minLevel))
         );
       })(),
@@ -34,5 +41,3 @@ export async function setupLogging() {
     ],
   });
 }
-
-export { getLogger };
