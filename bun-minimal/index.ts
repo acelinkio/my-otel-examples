@@ -1,11 +1,12 @@
-import './otel';
 import index from './index.html';
+import { setupOtel } from './otel';
 import { setupLogging } from './logger';
-import { startServer, attachGracefulShutdown, routes } from './server';
 import { trace as traceapi } from '@opentelemetry/api';
 import { getLogger } from "@logtape/logtape";
+import { startServer, attachGracefulShutdown, routes } from './server';
 
-setupLogging();
+await setupLogging();
+setupOtel();
 
 const logger = getLogger();
 

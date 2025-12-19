@@ -1,8 +1,5 @@
 import figlet from 'figlet';
-import { metrics as metricapi} from '@opentelemetry/api';
-
-const testmeter = metricapi.getMeterProvider().getMeter("local-test-meter");
-const counter = testmeter.createCounter('requests', { description: 'Request count' });
+import { metrics as metricapi } from '@opentelemetry/api';
 
 export function startServer(indexHtml: any, extraRoutes: Record<string, any> = {}) {
   const routes = {
@@ -32,6 +29,8 @@ export function attachGracefulShutdown(server: ReturnType<typeof Bun.serve>) {
 
 
 export function qHandler() {
+  const testmeter = metricapi.getMeterProvider().getMeter("local-test-meter");
+  const counter = testmeter.createCounter('requests', { description: 'Request count' });
   const body = figlet.textSync('Bun123!');
   counter.add(1, { route: '/q' });
   return new Response(body);
