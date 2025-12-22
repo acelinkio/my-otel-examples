@@ -18,10 +18,10 @@ This project was created using `bun init` in bun v1.3.3. [Bun](https://bun.com) 
 
 ```sh
 # OTEL_EXPORTER_OTLP_PROTOCOL=grpc
-# OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector.opentelemetry.svc.cluster.local:4317
+# OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
 
 unset OTEL_EXPORTER_OTLP_PROTOCOL OTEL_EXPORTER_OTLP_ENDPOINT
-OTEL_EXPORTER_OTLP_PROTOCOL=grpc OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector.opentelemetry.svc.cluster.local:4317 bun dev
+OTEL_EXPORTER_OTLP_PROTOCOL=grpc OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317 bun dev
 
 ```
 
