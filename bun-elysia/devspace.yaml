@@ -25,7 +25,7 @@ deployments:
                   - name: OTEL_EXPORTER_OTLP_PROTOCOL
                     value: "grpc"
                   - name: OTEL_EXPORTER_OTLP_ENDPOINT
-                    value: "http://otel-collector.opentelemetry.svc.cluster.local:4317"
+                    value: "http://otel-collector.observability.svc.cluster.local:4317"
                 args:
                 - sleep
                 - "1000000"
