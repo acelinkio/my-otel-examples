@@ -13,16 +13,19 @@ const logger = getLogger();
 // https://elysiajs.com/patterns/opentelemetry
 
 const app = new Elysia()
-	.use(elysiaLogger(
+  .use(opentelemetry())
+  .use(elysiaLogger(
 		{
 			skip: (ctx) => ctx.path === "/api/health",
 		}
 	))
-  .use(opentelemetry())
   .get("/", () => {
     return elysiaRecord('testtrace', () => {
       return "hello123"
     })
+  })
+  .get("/abc", () => {
+    return "abc route"
   })
   .listen(3000);
 
