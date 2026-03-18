@@ -3,17 +3,15 @@ package main
 import (
 	"context"
 	"log/slog"
+	"os"
+	"os/signal"
+	"syscall"
 )
 
-func main() {
-	ctx := context.Background()
+func run(ctx context.Context) error {
 	app_name := "go-echo"
 
-	logger, _, err := SetupLogger(ctx)
-	if err != nil {
-		slog.Error("logger init", "err", err)
-	}
-	defer logger.Sync()
+	SetupLogger(ctx)
 
 	cleanup, err := SetupOtel(ctx, app_name)
 	if err != nil {
@@ -21,8 +19,19 @@ func main() {
 	}
 	defer cleanup(ctx)
 
-	err = SetupEcho(ctx, logger)
+	err = SetupEcho(ctx, app_name)
 	if err != nil {
 		slog.Error("echo init", "err", err)
+	}
+	return nil
+}
+
+func main() {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	if err := run(ctx); err != nil {
+		slog.ErrorContext(ctx, "Application failed", slog.Any("err", err))
+		os.Exit(1)
 	}
 }

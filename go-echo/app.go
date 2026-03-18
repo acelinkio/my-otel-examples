@@ -3,20 +3,23 @@ package main
 import (
 	"context"
 	"errors"
-	"github.com/labstack/echo/v4"
-	"github.com/labstack/echo/v4/middleware"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
 	"sort"
 	"strings"
-	"go.opentelemetry.io/contrib/instrumentation/github.com/labstack/echo/otelecho"
+	"time"
+
+	echootel "github.com/labstack/echo-opentelemetry"
+	"github.com/labstack/echo/v5"
+	"github.com/labstack/echo/v5/middleware"
 )
 
-func SetupEcho(ctx context.Context, logger *SlogAdapter) error {
+func SetupEcho(ctx context.Context, servicename string) error {
 	e := echo.New()
-	e.HideBanner = true
-	e.Logger.SetOutput(logger)
+	e.Use(echootel.NewMiddleware(servicename))
+	e.Logger = slog.Default()
 
 	// build ignore list from env or fall back to defaults
 	var ignore []string
@@ -53,57 +56,89 @@ func SetupEcho(ctx context.Context, logger *SlogAdapter) error {
 	// full configs https://github.com/labstack/echo/blob/master/middleware/request_logger.go
 	e.Use(middleware.RequestLoggerWithConfig(middleware.RequestLoggerConfig{
 		// declare a small set of paths to ignore
-		Skipper: func(c echo.Context) bool {
+		Skipper: func(c *echo.Context) bool {
 			p := c.Request().URL.Path
 			return contains(ignore, p)
 		},
 		LogStatus:    true,
 		LogURI:       true,
-		LogError:     true,
 		LogHost:      true,
 		LogMethod:    true,
 		LogUserAgent: true,
 		HandleError:  true, // forwards error to the global error handler, so it can decide appropriate status code
-		LogValuesFunc: func(c echo.Context, v middleware.RequestLoggerValues) error {
+		LogValuesFunc: func(c *echo.Context, v middleware.RequestLoggerValues) error {
+			requestCtx := c.Request().Context()
+			attrs := []slog.Attr{
+				slog.String("method", v.Method),
+				slog.Int("status", v.Status),
+				slog.String("host", v.Host),
+				slog.String("uri", v.URI),
+				slog.String("agent", v.UserAgent),
+			}
+
+			// default to Info log logLevel
+			logLevel := slog.LevelInfo
 			if v.Error == nil {
-				logger.LogAttrs(ctx, slog.LevelInfo, "web_request",
-					slog.String("method", v.Method),
-					slog.Int("status", v.Status),
-					slog.String("host", v.Host),
-					slog.String("uri", v.URI),
-					slog.String("agent", v.UserAgent),
-				)
+				slog.LogAttrs(requestCtx, logLevel, "web_request", attrs...)
 			} else {
-				logger.LogAttrs(ctx, slog.LevelError, "web_request_error",
-					slog.String("method", v.Method),
-					slog.Int("status", v.Status),
-					slog.String("host", v.Host),
-					slog.String("uri", v.URI),
-					slog.String("agent", v.UserAgent),
-					slog.String("err", v.Error.Error()),
-				)
+				errMsg := v.Error.Error()
+				var internalMsg string
+				if he, ok := errors.AsType[*echo.HTTPError](v.Error); ok {
+					errMsg = he.Message
+					if internalErr := errors.Unwrap(he); internalErr != nil {
+						internalMsg = internalErr.Error()
+					}
+				}
+				attrs = append(attrs, slog.String("error", errMsg))
+				if internalMsg != "" {
+					attrs = append(attrs, slog.String("internal", internalMsg))
+				}
+				if v.Status >= 500 {
+					logLevel = slog.LevelError
+				}
+				slog.LogAttrs(requestCtx, logLevel, "web_request_error", attrs...)
 			}
 			return nil
 		},
 	}))
 
 	e.Use(middleware.Recover())
-	e.Use(otelecho.Middleware("http.server/echo", otelecho.WithSkipper(func(c echo.Context) bool {
-		return c.Path() == "/auth/health" || c.Path() == "/auth/ready"
-	})))	
 
 	e.GET("/", hello)
 	e.GET("/health", health)
-	if err := e.Start(":8025"); err != nil && !errors.Is(err, http.ErrServerClosed) {
-		return err
+
+	host := "[::]"
+	port := "8025"
+
+	sc := echo.StartConfig{
+		Address:         host + ":" + port,
+		GracefulTimeout: 5 * time.Second,
+		HidePort:        true,
+		HideBanner:      true,
 	}
+	slog.InfoContext(ctx, "web server",
+		slog.String("state", "starting"),
+		slog.String("host", host),
+		slog.String("port", port),
+	)
+	err := sc.Start(ctx, e)
+	slog.InfoContext(ctx, "web server",
+		slog.String("state", "stopped"),
+		slog.String("host", host),
+		slog.String("port", port),
+	)
+
+	if err != nil && !errors.Is(err, http.ErrServerClosed) {
+		return fmt.Errorf("web server error: %w", err)
+	}
+
 	return nil
 }
 
-func hello(c echo.Context) error {
+func hello(c *echo.Context) error {
 	return c.String(http.StatusOK, "Hello, World!")
 }
 
-func health(c echo.Context) error {
+func health(c *echo.Context) error {
 	return c.String(http.StatusOK, "I AM HEALTHY")
 }
