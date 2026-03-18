@@ -36,8 +36,9 @@ deployments:
 dev:
   backend:
     imageSelector: docker.io/busybox:1.28
-    devImage: docker.io/golang:1.25
+    devImage: docker.io/golang:1.26
     workingDir: /app
+    ssh: {}
     sync:
       - path: .:/app
         startContainer: true
@@ -47,6 +48,10 @@ dev:
       - bash
       - -c
       - |
+        echo "installing golang language server for ide integrations"
+        go install golang.org/x/tools/gopls@latest
+        echo "Setting path to avoid issues when ssh using devspace"
+        echo 'export PATH=$PATH:/usr/local/go/bin:/go/bin/' >> $HOME/.bashrc
         sleep 100000
     ports:
       - port: "8025"
