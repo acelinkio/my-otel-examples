@@ -17,7 +17,7 @@ func run(ctx context.Context) error {
 	if err != nil {
 		slog.Error("otel init", "err", err)
 	}
-	defer cleanup(ctx)
+	defer cleanup()
 
 	err = SetupEcho(ctx, app_name)
 	if err != nil {

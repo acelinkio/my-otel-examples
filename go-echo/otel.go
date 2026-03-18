@@ -2,45 +2,33 @@ package main
 
 import (
 	"context"
-	"errors"
 	"log/slog"
 	"os"
 	"strings"
 
-	otel "go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/sdk/resource"
-	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
-
+	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc"
 	"go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploghttp"
+	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc"
+	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
 	logotel "go.opentelemetry.io/otel/log"
 	logotelglobal "go.opentelemetry.io/otel/log/global"
 	logotelnoop "go.opentelemetry.io/otel/log/noop"
-	logsdk "go.opentelemetry.io/otel/sdk/log"
-
-	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc"
-	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp"
 	metricotel "go.opentelemetry.io/otel/metric"
 	metricotelnoop "go.opentelemetry.io/otel/metric/noop"
+	"go.opentelemetry.io/otel/propagation"
+	logsdk "go.opentelemetry.io/otel/sdk/log"
 	metricsdk "go.opentelemetry.io/otel/sdk/metric"
-
-	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
-	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
+	"go.opentelemetry.io/otel/sdk/resource"
 	tracesdk "go.opentelemetry.io/otel/sdk/trace"
+	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
 	traceotel "go.opentelemetry.io/otel/trace"
 	traceotelnoop "go.opentelemetry.io/otel/trace/noop"
 )
 
-func SetupOtel(ctx context.Context, servicename string) (func(context.Context) error, error) {
-	var le logsdk.Exporter
-	var me metricsdk.Exporter
-	var te tracesdk.SpanExporter
-	var err error
-
-	if os.Getenv("OTEL_SERVICE_NAME") != "" {
-		servicename = strings.TrimSpace(os.Getenv("OTEL_SERVICE_NAME"))
-	}
-
+func SetupOtel(ctx context.Context, servicename string) (func(), error) {
 	res, err := resource.New(
 		ctx,
 		resource.WithAttributes(semconv.ServiceNameKey.String(servicename)),
@@ -55,23 +43,58 @@ func SetupOtel(ctx context.Context, servicename string) (func(context.Context) e
 		return nil, err
 	}
 
-	slog.Info("Configuring OTEL")
+	otel.SetTextMapPropagator(
+		propagation.NewCompositeTextMapPropagator(
+			propagation.TraceContext{},
+			propagation.Baggage{},
+		),
+	)
+
+	endpoint := strings.TrimSpace(os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT"))
+	var le logsdk.Exporter
+	var me metricsdk.Exporter
+	var te tracesdk.SpanExporter
+
 	switch {
-	case strings.TrimSpace(os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT")) == "":
-		slog.Info("Using OLTP exporter", "type", "noop")
+	case endpoint == "":
+		slog.InfoContext(ctx, "open telemetry otlp", slog.String("type", "noop"), slog.String("endpoint", endpoint))
 		le = nil
 		me = nil
 		te = nil
 	case strings.ToLower(strings.TrimSpace(os.Getenv("OTEL_EXPORTER_OTLP_PROTOCOL"))) == "grpc":
-		slog.Info("Using OLTP exporter", "type", "grpc")
+		slog.InfoContext(ctx, "open telemetry otlp", slog.String("type", "grpc"), slog.String("endpoint", endpoint))
 		le, err = otlploggrpc.New(ctx)
+		if err != nil {
+			slog.ErrorContext(ctx, "failed setting up exporter", slog.Any("err", err))
+			return nil, err
+		}
 		me, err = otlpmetricgrpc.New(ctx)
+		if err != nil {
+			slog.ErrorContext(ctx, "failed setting up exporter", slog.Any("err", err))
+			return nil, err
+		}
 		te, err = otlptracegrpc.New(ctx)
+		if err != nil {
+			slog.ErrorContext(ctx, "failed setting up exporter", slog.Any("err", err))
+			return nil, err
+		}
 	default:
-		slog.Info("Using OLTP exporter", "type", "http")
+		slog.InfoContext(ctx, "open telemetry otlp", slog.String("type", "http/proto"), slog.String("endpoint", endpoint))
 		le, err = otlploghttp.New(ctx)
+		if err != nil {
+			slog.ErrorContext(ctx, "failed setting up provider", slog.Any("err", err))
+			return nil, err
+		}
 		me, err = otlpmetrichttp.New(ctx)
+		if err != nil {
+			slog.ErrorContext(ctx, "failed setting up provider", slog.Any("err", err))
+			return nil, err
+		}
 		te, err = otlptracehttp.New(ctx)
+		if err != nil {
+			slog.ErrorContext(ctx, "failed setting up provider", slog.Any("err", err))
+			return nil, err
+		}
 	}
 	if err != nil {
 		return nil, err
@@ -112,6 +135,7 @@ func SetupOtel(ctx context.Context, servicename string) (func(context.Context) e
 	otel.SetTracerProvider(tp)
 
 	// configure shutting down
+	// noop providers do not have a Shudown method
 	log_shutdown := func(ctx context.Context) error {
 		if otelprovider, ok := lp.(*logsdk.LoggerProvider); ok && otelprovider != nil {
 			return otelprovider.Shutdown(ctx)
@@ -133,24 +157,25 @@ func SetupOtel(ctx context.Context, servicename string) (func(context.Context) e
 		return nil
 	}
 
-	return func(ctx context.Context) error {
-		slog.Info("Shutting down OTEL")
+	return func() {
+		ctx := context.Background()
+		slog.DebugContext(ctx, "otel shutdown",
+			slog.String("state", "starting"),
+		)
 
-		// run shutdowns and collect errors
-		var errs []error
 		if err := trace_shutdown(ctx); err != nil {
-			errs = append(errs, err)
+			slog.WarnContext(ctx, "trace shutdown failed", slog.Any("err", err))
 		}
 		if err := metric_shutdown(ctx); err != nil {
-			errs = append(errs, err)
+			slog.WarnContext(ctx, "metric shutdown failed", slog.Any("err", err))
 		}
 		if err := log_shutdown(ctx); err != nil {
-			errs = append(errs, err)
+			slog.WarnContext(ctx, "log shutdown failed", slog.Any("err", err))
 		}
 
-		if len(errs) == 0 {
-			return nil
-		}
-		return errors.Join(errs...)
+		slog.DebugContext(ctx, "otel shutdown",
+			slog.String("state", "completed"),
+		)
+
 	}, nil
 }
