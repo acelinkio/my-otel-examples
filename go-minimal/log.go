@@ -6,19 +6,9 @@ import (
 	"os"
 	"strings"
 
-	"go.opentelemetry.io/contrib/bridges/otelslog"
-	"go.opentelemetry.io/otel/log/global"
+	logotelbridge "go.opentelemetry.io/contrib/bridges/otelslog"
+	logotelglobal "go.opentelemetry.io/otel/log/global"
 )
-
-// SlogAdapter embeds slog.Logger and adds a Sync method so callers that expect
-// a zap-like logger can still call Sync().
-type SlogAdapter struct {
-	*slog.Logger
-}
-
-func (a *SlogAdapter) Sync() error {
-	return nil
-}
 
 type tee struct {
 	a, b slog.Handler
@@ -35,22 +25,22 @@ func NewTee(a, b slog.Handler, minA, minB slog.Level) slog.Handler {
 }
 
 func (t *tee) Enabled(ctx context.Context, level slog.Level) bool {
-	if (t.minA == 0 || level >= t.minA) && t.a.Enabled(ctx, level) {
+	if level >= t.minA && t.a.Enabled(ctx, level) {
 		return true
 	}
-	if (t.minB == 0 || level >= t.minB) && t.b.Enabled(ctx, level) {
+	if level >= t.minB && t.b.Enabled(ctx, level) {
 		return true
 	}
 	return false
 }
 
 func (t *tee) Handle(ctx context.Context, r slog.Record) error {
-	if t.minA == 0 || r.Level >= t.minA {
+	if r.Level >= t.minA {
 		if err := t.a.Handle(ctx, r); err != nil {
 			return err
 		}
 	}
-	if t.minB == 0 || r.Level >= t.minB {
+	if r.Level >= t.minB {
 		return t.b.Handle(ctx, r)
 	}
 	return nil
@@ -64,17 +54,17 @@ func (t *tee) WithGroup(name string) slog.Handler {
 	return NewTee(t.a.WithGroup(name), t.b.WithGroup(name), t.minA, t.minB)
 }
 
-func SetupLogger(ctx context.Context) (*SlogAdapter, func(context.Context) error, error) {
+func SetupLogger(ctx context.Context) {
 	stdout := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
+		Level: slog.LevelDebug, // Allow all levels through, tee filters
 		ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
-			// drop the default time attribute so text output has no timestamp
 			if a.Key == "time" {
 				return slog.Attr{}
 			}
 			return a
 		},
 	})
-	otelHandler := otelslog.NewHandler("mylog", otelslog.WithLoggerProvider(global.GetLoggerProvider()))
+	otelHandler := logotelbridge.NewHandler("slog", logotelbridge.WithLoggerProvider(logotelglobal.GetLoggerProvider()))
 
 	minStdout := parseLogLevel(os.Getenv("STDOUT_LOG_LEVEL"))
 	minOtel := parseLogLevel(os.Getenv("OTEL_LOG_LEVEL"))
@@ -82,11 +72,8 @@ func SetupLogger(ctx context.Context) (*SlogAdapter, func(context.Context) error
 	handler := NewTee(stdout, otelHandler, minStdout, minOtel)
 
 	logger := slog.New(handler)
-	adapter := &SlogAdapter{logger}
-	shutdown := func(ctx context.Context) error { return nil }
 
-	slog.SetDefault(adapter.Logger)
-	return adapter, shutdown, nil
+	slog.SetDefault(logger)
 }
 
 func parseLogLevel(v string) slog.Level {

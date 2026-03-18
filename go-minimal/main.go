@@ -8,11 +8,7 @@ import (
 func main() {
 	ctx := context.Background()
 
-	logger, _, err := SetupLogger(ctx)
-	if err != nil {
-		slog.Error("logger init", "err", err)
-	}
-	defer logger.Sync()
+	SetupLogger(ctx)
 
 	cleanup, err := SetupOtel(ctx)
 	if err != nil {
@@ -20,7 +16,7 @@ func main() {
 	}
 	defer cleanup(ctx)
 
-	slog.Info("info: dog barks")
-	slog.Warn("warning: don't 123")
-	slog.Error("error: hey0123")
+	slog.Info("my info log: dog barks")
+	slog.Warn("my warning log: don't 123")
+	slog.Error("my error log: hey0123")
 }
