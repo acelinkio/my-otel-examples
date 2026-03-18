@@ -1,0 +1,31 @@
+version: v2beta1
+name: auth
+dev:
+  auth:
+    labelSelector:
+      app.kubernetes.io/name: example
+      app.kubernetes.io/component: auth
+    ports:
+      - port: "8030"
+    containers:
+      main:
+        devImage: docker.io/golang:1.26
+        workingDir: /app
+        ssh: {}
+        proxyCommands:
+          - gitCredentials: true
+        env:
+          - name: myexample
+            value: test
+        sync:
+          - path: .:/app
+            startContainer: true
+            onUpload:
+              restartContainer: true
+        command:
+          - bash
+          - -c
+          - |
+            echo "installing golang language server for ide integrations"
+            go install golang.org/x/tools/gopls@latest
+            sleep 100000
